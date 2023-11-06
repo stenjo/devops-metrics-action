@@ -49,6 +49,12 @@ jobs:
         color: ${{ steps.coverageComment.outputs.color }}
         namedLogo: jest
 
+    - name: Comment Test Coverage
+      uses: AthleticNet/comment-test-coverage@1.2.2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: coverage/coverage-summary.json
+        title: Jest Test Coverage
 
   # test action works running from the graph
   test:
