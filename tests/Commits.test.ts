@@ -1,17 +1,17 @@
 import {CommitsAdapter} from '../src/CommitsAdapter'
-import {Commit} from '../src/types/Commit'
-import fs from 'fs'
+import type {Commit} from '../src/types/Commit'
+import fs from 'node:fs'
 import * as dotenv from 'dotenv'
 
 dotenv.config()
 
 test('fetches commits', async () => {
-  const cmts = new CommitsAdapter(process.env['GH_TOKEN'])
+  const cmts = new CommitsAdapter(process.env.GH_TOKEN)
   const getCommitsMock = jest.spyOn(
     CommitsAdapter.prototype as any,
     'getCommits'
   )
-  getCommitsMock.mockImplementation((): Promise<Commit[] | undefined> => {
+  getCommitsMock.mockImplementation(async (): Promise<Commit[] | undefined> => {
     return Promise.resolve(
       JSON.parse(
         fs.readFileSync('./tests/test-data/commits.json').toString()
@@ -26,7 +26,7 @@ test('fetches commits', async () => {
 })
 
 test.skip('CommitsAdapter should', async () => {
-  const ca = new CommitsAdapter(process.env['GH_TOKEN'])
+  const ca = new CommitsAdapter(process.env.GH_TOKEN)
 
   const result = await ca.getCommitsFromUrl(
     'https://api.github.com/repos/stenjo/devops-metrics-action/pulls/69/commits'
