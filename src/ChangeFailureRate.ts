@@ -1,5 +1,5 @@
-import {Issue} from './types/Issue'
-import {Release} from './types/Release'
+import type {Issue} from './types/Issue'
+import type {Release} from './types/Release'
 
 export class ChangeFailureRate {
   today: Date
@@ -8,7 +8,11 @@ export class ChangeFailureRate {
   repos: string[]
 
   constructor(issues: Issue[], releases: Release[], today: Date | null = null) {
-    today === null ? (this.today = new Date()) : (this.today = today)
+    if (today === null) {
+      this.today = new Date()
+    } else {
+      this.today = today
+    }
     this.issues = issues
     this.releases = releases
       .sort((a, b) =>
@@ -46,9 +50,10 @@ export class ChangeFailureRate {
       }
     }
     // const bugDates = this.getBugs().map(issue => +new Date(issue.created_at))
-    const releaseDates = this.releases.map(function (release) {
-      return {published: +new Date(release.published_at), url: release.url}
-    })
+    const releaseDates = this.releases.map(release => ({
+      published: +new Date(release.published_at),
+      url: release.url
+    }))
     for (const repo of this.repos) {
       releaseDates.push({published: Date.now(), url: repo})
     }
@@ -58,7 +63,7 @@ export class ChangeFailureRate {
       const releasesForRepo = releaseDates.filter(r => r.url.includes(repo))
       for (let i = 0; i < releasesForRepo.length - 1; i++) {
         if (
-          bugs.filter(function (bug) {
+          bugs.filter(bug => {
             if (bug.repository_url.split('/').reverse()[0] !== repo) {
               return false
             }
