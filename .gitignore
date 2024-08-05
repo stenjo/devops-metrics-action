@@ -68,6 +68,5 @@ typings/
 .next
 out/index.js
 reports/**
-
-# stryker temp files
-.stryker-tmp
+**/.DS_Store
+**/.stryker-tmp
