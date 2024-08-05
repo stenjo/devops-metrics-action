@@ -38,6 +38,7 @@
     "jshint": "^2.13.6",
     "json-query": "^2.2.2",
     "node-fetch": "^3.3.2",
+    "npm": "^10.8.2",
     "stryker-cli": "^1.0.2",
     "ts-node": "^10.9.1"
   },
