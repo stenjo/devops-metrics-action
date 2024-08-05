@@ -2,8 +2,8 @@ import {http, HttpResponse} from 'msw'
 import {setupServer} from 'msw/node'
 import {setFailed} from '@actions/core'
 import {CommitsAdapter} from '../src/CommitsAdapter'
-import fs from 'fs'
-import {Commit} from '../src/types/Commit'
+import fs from 'node:fs'
+import type {Commit} from '../src/types/Commit'
 
 const commitsUrl =
   'https://api.github.com/repos/stenjo/devops-metrics-action/pulls/69/commits'

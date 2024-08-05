@@ -1,18 +1,18 @@
 //
 import {DeployFrequency} from '../src/DeployFrequency'
-import fs from 'fs'
-import {Release} from '../src/types/Release'
+import fs from 'node:fs'
+import type {Release} from '../src/types/Release'
 
 describe('Deploy frequency should', () => {
   // Release v0.0.1:2023-04-14, v0.0.2:2023-04-22
-  const releaseList2: Array<Release> = JSON.parse(
+  const releaseList2: Release[] = JSON.parse(
     fs.readFileSync('./tests/test-data/one-release.json', 'utf-8')
   )
   // Release
   // v0.0.1:2023-04-12, v0.0.2:2023-04-22, v0.1.0:2023-04-29,
   // v0.2.0:2023-04-30, v0.2.1:2023-04-30, v0.3.0-beta:2023-04-30,
   // v0.3.1-beta:2023-04-30
-  const releaseList7: Array<Release> = JSON.parse(
+  const releaseList7: Release[] = JSON.parse(
     fs.readFileSync('./tests/test-data/releases.json', 'utf-8')
   )
   it('calculate releases pr week for release less than 1 week', () => {
@@ -60,7 +60,7 @@ describe('Deploy frequency should', () => {
   it('throw exception when no releases', () => {
     const emptyReleaseList: Release[] = []
 
-    const t = () => {
+    const t = (): void => {
       new DeployFrequency(emptyReleaseList)
     }
 
