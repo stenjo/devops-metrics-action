@@ -1,6 +1,6 @@
 //
 
-import {Release} from './types/Release'
+import { Release } from './types/Release'
 
 // The number of milliseconds in one day
 const ONE_DAY = 1000 * 60 * 60 * 24

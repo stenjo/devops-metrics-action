@@ -1,5 +1,5 @@
-import {Issue} from './types/Issue'
-import {Release} from './types/Release'
+import { Issue } from './types/Issue'
+import { Release } from './types/Release'
 
 export interface BugTime {
   start: number
@@ -33,7 +33,7 @@ export class MeanTimeToRestore {
     }
     this.releaseDates = this.releases
       .map(function (r) {
-        return {published: +new Date(r.published_at), url: r.url}
+        return { published: +new Date(r.published_at), url: r.url }
       })
       .sort((a, b) => a.published - b.published) // Sort ascending
   }

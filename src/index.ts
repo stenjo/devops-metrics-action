@@ -1,17 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import {ReleaseAdapter} from './ReleaseAdapter'
-import {DeployFrequency} from './DeployFrequency'
-import {ChangeFailureRate} from './ChangeFailureRate'
-import {Issue} from './types/Issue'
-import {IssuesAdapter} from './IssuesAdapter'
-import {MeanTimeToRestore} from './MeanTimeToRestore'
-import {PullRequestsAdapter} from './PullRequestsAdapter'
-import {CommitsAdapter} from './CommitsAdapter'
-import {LeadTime} from './LeadTime'
-import {Release} from './types/Release'
-import {PullRequest} from './types/PullRequest'
+import { ReleaseAdapter } from './ReleaseAdapter'
+import { DeployFrequency } from './DeployFrequency'
+import { ChangeFailureRate } from './ChangeFailureRate'
+import { Issue } from './types/Issue'
+import { IssuesAdapter } from './IssuesAdapter'
+import { MeanTimeToRestore } from './MeanTimeToRestore'
+import { PullRequestsAdapter } from './PullRequestsAdapter'
+import { CommitsAdapter } from './CommitsAdapter'
+import { LeadTime } from './LeadTime'
+import { Release } from './types/Release'
+import { PullRequest } from './types/PullRequest'
 
 async function run(): Promise<void> {
   try {

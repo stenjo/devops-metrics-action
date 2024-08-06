@@ -1,5 +1,5 @@
-import {Issue} from './types/Issue'
-import {Release} from './types/Release'
+import { Issue } from './types/Issue'
+import { Release } from './types/Release'
 
 export class ChangeFailureRate {
   today: Date
@@ -47,10 +47,10 @@ export class ChangeFailureRate {
     }
     // const bugDates = this.getBugs().map(issue => +new Date(issue.created_at))
     const releaseDates = this.releases.map(function (release) {
-      return {published: +new Date(release.published_at), url: release.url}
+      return { published: +new Date(release.published_at), url: release.url }
     })
     for (const repo of this.repos) {
-      releaseDates.push({published: Date.now(), url: repo})
+      releaseDates.push({ published: Date.now(), url: repo })
     }
 
     let failedDeploys = 0

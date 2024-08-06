@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {Octokit} from '@octokit/core'
+import { Octokit } from '@octokit/core'
 import * as core from '@actions/core'
-import {IIssuesAdapter} from './interfaces/IIssuesAdapter'
-import {Issue} from './types/Issue'
+import { IIssuesAdapter } from './interfaces/IIssuesAdapter'
+import { Issue } from './types/Issue'
 
 export class IssuesAdapter implements IIssuesAdapter {
   token: string | undefined

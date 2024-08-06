@@ -1,17 +1,17 @@
-name: "DevOps Metrics from GitHub"
+name: 'DevOps Metrics from GitHub'
 author: 'Sten Otto Johnsen'
 description: 'Outputs a set of key metrics based on GitHub issues and releases'
 branding:
-  icon: "align-justify"
-  color: "green"
+  icon: 'align-justify'
+  color: 'green'
 inputs:
-  owner:  # organization
+  owner: # organization
     description: 'Owner of the repo. Org or user'
     required: false
-  repo:  # repository
+  repo: # repository
     description: 'Repository name'
     required: false
-  token:  # repository
+  token: # repository
     description: 'Repository access token'
     required: false
   logging: # history

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {Person} from './Person'
+import { Person } from './Person'
 
 export interface Release {
   url: string
