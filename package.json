@@ -34,7 +34,7 @@
     "@actions/github": "^6.0.0",
     "@octokit/core": "^4.2.4",
     "@types/babel-core": "^6.25.8",
-    "@types/json-query": "^2.2.3",
+    "@types/json-query": "^2.2.6",
     "jshint": "^2.13.6",
     "json-query": "^2.2.2",
     "node-fetch": "^3.3.2",
