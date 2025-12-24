@@ -1,0 +1,16 @@
+name: Lead Time Tracking
+
+on:
+  pull_request:
+    types: [closed]
+  push:
+    branches: [main]
+
+jobs:
+  lead-time:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Calculate Lead Time
+        uses: DeveloperMetrics/lead-time-for-changes@v1
+        with:
+          workflows: 'Deploy'  # Name of your deployment workflow
