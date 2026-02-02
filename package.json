@@ -68,7 +68,7 @@
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@actions/github": "^6.0.0",
+    "@actions/github": "^9.0.0",
     "@octokit/core": "^5.2.0",
     "octokit": "^4.0.2"
   },
