@@ -47,7 +47,7 @@ jobs:
       - name: Save stryker JS log
         if: failure()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: stryker.log
           path: stryker.log
@@ -72,7 +72,7 @@ jobs:
           valColorRange: ${{ env.stryker-score }}
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mutation-report
           retention-days: 1
