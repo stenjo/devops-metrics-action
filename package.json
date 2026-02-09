@@ -70,7 +70,7 @@
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@octokit/core": "^5.2.0",
-    "octokit": "^4.0.2"
+    "octokit": "^5.0.5"
   },
   "devDependencies": {
     "@babel/cli": "^7.25.6",
