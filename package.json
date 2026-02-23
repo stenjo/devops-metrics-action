@@ -54,8 +54,12 @@
       "/dist/"
     ],
     "transform": {
-      "^.+\\.ts$": "ts-jest"
+      "^.+\\.ts$": "ts-jest",
+      "^.+\\.js$": "babel-jest"
     },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(@octokit|universal-user-agent|before-after-hook)/)"
+    ],
     "coverageReporters": [
       "json-summary",
       "text",
@@ -69,7 +73,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@octokit/core": "^5.2.0",
+    "@octokit/core": "^7.0.6",
     "octokit": "^4.0.2"
   },
   "devDependencies": {
@@ -92,6 +96,7 @@
     "axios-mock-adapter": "^2.0.0",
     "dotenv": "^16.4.5",
     "eslint": "^8.57.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-github": "^5.0.1",
     "eslint-plugin-jest": "^28.8.2",
     "eslint-plugin-jsonc": "^2.16.0",

@@ -79,3 +79,7 @@ rules:
     '@typescript-eslint/space-before-function-paren': 'off',
     '@typescript-eslint/unbound-method': 'error'
   }
+
+settings:
+  import/resolver:
+    typescript: true
