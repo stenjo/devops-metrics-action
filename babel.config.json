@@ -1,8 +1,0 @@
-{
-  "presets": [
-    ["@babel/preset-env", {"useBuiltIns": "usage", "corejs": "2"}],
-    ["@babel/preset-react", {"development": true, "minify": true}]
-  ],
-
-  "plugins": ["@babel/plugin-syntax-dynamic-import"]
-}

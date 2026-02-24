@@ -7,7 +7,7 @@ on:
       - 'releases/*'
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
   units:
     runs-on: ubuntu-latest
     env:
-      covGistPrefix: 'https://gist.githubusercontent.com/stenjo/9ce1ad7d8e9db99796e782b244eefa4a/raw/f52cd85b82dd774ba0ce9d052f7ff2be505ea2d0'
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -30,18 +30,18 @@ jobs:
       - run: npm ci
       - name: Run tests
         run: |
-          npx jest --coverage | tee ./coverage.txt && exit "${PIPESTATUS[0]}"
+          npx vitest run --coverage 2>&1 | tee ./coverage.txt
 
       - name: Get branch name
         id: branch-name
         uses: tj-actions/branch-names@v8
 
-      - name: Jest Coverage Comment
+      - name: Vitest Coverage Comment
         id: coverageComment
         uses: MishaKav/jest-coverage-comment@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          summary-title: Jest Coverage (summary)
+          summary-title: Vitest Coverage (summary)
           title: Test Coverage
           coverage-summary-path: coverage/coverage-summary.json
           coverage-path: ./coverage.txt
@@ -53,32 +53,32 @@ jobs:
           echo "Summary HTML - ${{ steps.coverageComment.outputs.summaryHtml }}"
           mv coverage/coverage-summary.json .
 
-      - name: Create the Badge
-        uses: schneegans/dynamic-badges-action@v1.7.0
+      - name: Create coverage badge
         if: steps.branch-name.outputs.current_branch == 'main'
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gistID: 9ce1ad7d8e9db99796e782b244eefa4a
-          filename: devops_metrics__${{ steps.branch-name.outputs.current_branch }}.json
-          label: Test Coverage
-          message: ${{ steps.coverageComment.outputs.coverage }}%
-          color: ${{ steps.coverageComment.outputs.color }}
-          namedLogo: jest
+        run: |
+          COVERAGE=${{ steps.coverageComment.outputs.coverage }}
+          COLOR=${{ steps.coverageComment.outputs.color }}
+          mkdir -p badges
+          curl -s "https://img.shields.io/badge/Test%20Coverage-${COVERAGE}%25-${COLOR}" > badges/coverage.svg
 
-      - name: Gist Sync File
-        uses: danielmcconville/gist-sync-file-action@v2.0.0
+      - name: Commit coverage badge and summary
         if: steps.branch-name.outputs.current_branch == 'main'
-        with:
-          gistPat: ${{ secrets.GIST_AUTH_TOKEN }}
-          action: update
-          filename: coverage-summary.json
-          gistId: 9ce1ad7d8e9db99796e782b244eefa4a
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          mkdir -p data
+          cp coverage-summary.json data/coverage-summary.json
+          git add badges/coverage.svg data/coverage-summary.json
+          if ! git diff --staged --quiet; then
+            git commit -m "Update coverage badge and summary [skip ci]"
+            git push
+          fi
 
-      - name: Get coverage Gist
+      - name: Get main coverage for diff
         if: steps.branch-name.outputs.current_branch != 'main'
         run: |
-          curl -o main-coverage.json ${{ env.covGistPrefix }}/coverage-summary.json
-          function diff {     diff="$(echo "$2" - "$1" | bc -l | sed -e 's/^\./0./' -e 's/^-\./-0./')";     echo "$diff"; }
+          curl -sf "https://raw.githubusercontent.com/${{ github.repository }}/main/data/coverage-summary.json" -o main-coverage.json || echo '{"total":{"lines":{"pct":0}}}' > main-coverage.json
+          function diff {     diff="$(echo "$2" - "$1" | bc -l | sed -e 's/^\./0./' -e 's/^-\./-0./')" ;    echo "$diff"; }
           current=$(jq .total.lines.pct coverage-summary.json)
           main=$(jq .total.lines.pct main-coverage.json)
           pctLineChange=$(diff "$main" "$current")

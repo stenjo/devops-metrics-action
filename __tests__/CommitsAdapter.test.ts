@@ -1,24 +1,32 @@
-import type {Octokit} from '@octokit/rest'
-import * as core from '@actions/core'
-import {CommitsAdapter} from '../src/CommitsAdapter' // Adjust the import path as necessary
+import {http, HttpResponse} from 'msw'
+import {setupServer} from 'msw/node'
+import {setFailed} from '@actions/core'
+import {CommitsAdapter} from '../src/CommitsAdapter'
+import fs from 'fs'
+import {Commit} from '../src/types/Commit'
 
-jest.mock('@octokit/rest')
-jest.mock('@actions/core')
+const commitsUrl =
+  'https://api.github.com/repos/stenjo/devops-metrics-action/pulls/69/commits'
+const server = setupServer(
+  http.get(
+    commitsUrl,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ({request, params, cookies}) => {
+      const commits: Commit[] = JSON.parse(
+        fs.readFileSync('./__tests__/test-data/commits.json').toString()
+      ) as Commit[]
+      return HttpResponse.json(commits)
+    }
+  )
+)
+vi.mock('@actions/core', () => ({
+  setFailed: vi.fn()
+}))
 
-describe('CommitsAdapter', () => {
-  let commitsAdapter: CommitsAdapter
-  let octokitMock: jest.Mocked<Octokit>
-
+describe('Commit Adapter should', () => {
   beforeEach(() => {
-    octokitMock = {
-      request: jest.fn()
-    } as unknown as jest.Mocked<Octokit>
-    commitsAdapter = new CommitsAdapter('fake-token')
-    commitsAdapter.octokit = octokitMock as never
-  })
-
-  afterEach(() => {
-    jest.clearAllMocks()
+    server.listen()
+    vi.clearAllMocks()
   })
 
   it('should return commits when the request is successful', async () => {

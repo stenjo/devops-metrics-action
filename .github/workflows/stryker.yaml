@@ -69,38 +69,49 @@ jobs:
       - name: Extract stryker score
         id: extract-stryker-score
         run: |
-          grep "All files" out > line
-          awk '{print $4}' line > fullscore
-          awk '{split($0,a,"."); print a[1]}' fullscore > score
-          echo "stryker-score=$(tr -s '\n' < score)" >> "$GITHUB_ENV"
+          REPORT="reports/mutation/mutation.json"
+          if [ -f "$REPORT" ]; then
+            KILLED=$(jq '[.files[].mutants[] | select(.status == "Killed")] | length' "$REPORT")
+            TIMEOUT=$(jq '[.files[].mutants[] | select(.status == "Timeout")] | length' "$REPORT")
+            SURVIVED=$(jq '[.files[].mutants[] | select(.status == "Survived")] | length' "$REPORT")
+            NOCOV=$(jq '[.files[].mutants[] | select(.status == "NoCoverage")] | length' "$REPORT")
+            TOTAL=$((KILLED + TIMEOUT + SURVIVED + NOCOV))
+            if [ "$TOTAL" -gt 0 ]; then
+              SCORE=$(echo "scale=2; ($KILLED + $TIMEOUT) * 100 / $TOTAL" | bc -l | awk '{split($0,a,"."); print a[1]}')
+            else
+              SCORE=0
+            fi
+          else
+            echo "::warning::Stryker JSON report not found, falling back to text parsing"
+            SCORE=$(grep "All files" out | awk '{print $4}' | awk '{split($0,a,"."); print a[1]}')
+            SCORE=${SCORE:-0}
+          fi
+          echo "stryker-score=$SCORE" >> "$GITHUB_ENV"
+          echo "Mutation score: $SCORE%"
 
-      - name: Create the Badge for Deploy Rate
-        continue-on-error: true
-        uses: Schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ steps.app-token.outputs.token }}
-          gistID: 9ce1ad7d8e9db99796e782b244eefa4a
-          filename: dora-stryker.json
-          label: Mutation Score
-          namedLogo: stryker
-          message: ${{ steps.extract-stryker-score.outputs.stryker-score }}%
-          minColorRange: 50
-          maxColorRange: 90
-          valColorRange: ${{ steps.extract-stryker-score.outputs.stryker-score }}
+      - name: Create the Badge for Stryker Score
+        if: github.ref == 'refs/heads/main'
+        run: |
+          SCORE=${{ env.stryker-score }}
+          if [ "$SCORE" -ge 90 ]; then COLOR="brightgreen";
+          elif [ "$SCORE" -ge 80 ]; then COLOR="green";
+          elif [ "$SCORE" -ge 70 ]; then COLOR="yellowgreen";
+          elif [ "$SCORE" -ge 60 ]; then COLOR="yellow";
+          elif [ "$SCORE" -ge 50 ]; then COLOR="orange";
+          else COLOR="red"; fi
+          mkdir -p badges
+          curl -s "https://img.shields.io/badge/Stryker%20score-${SCORE}%25-${COLOR}" > badges/stryker.svg
 
-      - name: Create the SVG Badge for Deploy Rate
-        continue-on-error: true
-        uses: Schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ steps.app-token.outputs.token }}
-          gistID: 9ce1ad7d8e9db99796e782b244eefa4a
-          filename: dora-stryker.svg
-          label: Mutation Score
-          namedLogo: stryker
-          message: ${{ steps.extract-stryker-score.outputs.stryker-score }}%
-          minColorRange: 50
-          maxColorRange: 90
-          valColorRange: ${{ steps.extract-stryker-score.outputs.stryker-score }}
+      - name: Commit badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add badges/stryker.svg
+          if ! git diff --staged --quiet; then
+            git commit -m "Update Stryker score badge [skip ci]"
+            git push
+          fi
 
       - name: Upload results
         uses: actions/upload-artifact@v4
@@ -118,6 +129,7 @@ jobs:
         shell: /usr/bin/bash -e {0}
 
       - name: Add formatted table to PR comment
+        if: hashFiles('stryker-report.md') != ''
         uses: mshick/add-pr-comment@v2
         with:
           message-path: stryker-report.md
@@ -127,6 +139,7 @@ jobs:
           message-id: 'add-pr-stryker-comment-${{ github.event.pull_request.number }}'
 
       - name: Deploy HTML Report to GitHub Pages
+        if: hashFiles('reports/mutation/mutation.html') != ''
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

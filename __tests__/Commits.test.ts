@@ -7,7 +7,7 @@ dotenv.config()
 
 test('fetches commits', async () => {
   const adapter = new CommitsAdapter(process.env.GH_TOKEN)
-  const getCommitsMock = jest.spyOn(
+  const getCommitsMock = vi.spyOn(
     // eslint-disable-next-line  @typescript-eslint/no-explicit-any
     CommitsAdapter.prototype as any,
     'getCommits'

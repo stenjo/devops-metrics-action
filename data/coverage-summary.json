@@ -1,0 +1,117 @@
+{
+  "total": {
+    "lines": {"total": 267, "covered": 267, "skipped": 0, "pct": 100},
+    "statements": {"total": 273, "covered": 273, "skipped": 0, "pct": 100},
+    "functions": {"total": 58, "covered": 58, "skipped": 0, "pct": 100},
+    "branches": {"total": 117, "covered": 115, "skipped": 0, "pct": 98.29},
+    "branchesTrue": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/ChangeFailureRate.ts": {
+    "lines": {"total": 33, "covered": 33, "skipped": 0, "pct": 100},
+    "functions": {"total": 9, "covered": 9, "skipped": 0, "pct": 100},
+    "statements": {"total": 36, "covered": 36, "skipped": 0, "pct": 100},
+    "branches": {"total": 19, "covered": 19, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/CommitsAdapter.ts": {
+    "lines": {"total": 8, "covered": 8, "skipped": 0, "pct": 100},
+    "functions": {"total": 3, "covered": 3, "skipped": 0, "pct": 100},
+    "statements": {"total": 8, "covered": 8, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/DeployFrequency.ts": {
+    "lines": {"total": 27, "covered": 27, "skipped": 0, "pct": 100},
+    "functions": {"total": 6, "covered": 6, "skipped": 0, "pct": 100},
+    "statements": {"total": 27, "covered": 27, "skipped": 0, "pct": 100},
+    "branches": {"total": 11, "covered": 10, "skipped": 0, "pct": 90.9}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/IssuesAdapter.ts": {
+    "lines": {"total": 18, "covered": 18, "skipped": 0, "pct": 100},
+    "functions": {"total": 3, "covered": 3, "skipped": 0, "pct": 100},
+    "statements": {"total": 19, "covered": 19, "skipped": 0, "pct": 100},
+    "branches": {"total": 2, "covered": 2, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/LeadTime.ts": {
+    "lines": {"total": 42, "covered": 42, "skipped": 0, "pct": 100},
+    "functions": {"total": 10, "covered": 10, "skipped": 0, "pct": 100},
+    "statements": {"total": 42, "covered": 42, "skipped": 0, "pct": 100},
+    "branches": {"total": 29, "covered": 28, "skipped": 0, "pct": 96.55}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/MeanTimeToRestore.ts": {
+    "lines": {"total": 54, "covered": 54, "skipped": 0, "pct": 100},
+    "functions": {"total": 18, "covered": 18, "skipped": 0, "pct": 100},
+    "statements": {"total": 54, "covered": 54, "skipped": 0, "pct": 100},
+    "branches": {"total": 30, "covered": 30, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/PullRequestsAdapter.ts": {
+    "lines": {"total": 18, "covered": 18, "skipped": 0, "pct": 100},
+    "functions": {"total": 3, "covered": 3, "skipped": 0, "pct": 100},
+    "statements": {"total": 19, "covered": 19, "skipped": 0, "pct": 100},
+    "branches": {"total": 2, "covered": 2, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/ReleaseAdapter.ts": {
+    "lines": {"total": 18, "covered": 18, "skipped": 0, "pct": 100},
+    "functions": {"total": 3, "covered": 3, "skipped": 0, "pct": 100},
+    "statements": {"total": 19, "covered": 19, "skipped": 0, "pct": 100},
+    "branches": {"total": 2, "covered": 2, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/index.ts": {
+    "lines": {"total": 49, "covered": 49, "skipped": 0, "pct": 100},
+    "functions": {"total": 3, "covered": 3, "skipped": 0, "pct": 100},
+    "statements": {"total": 49, "covered": 49, "skipped": 0, "pct": 100},
+    "branches": {"total": 22, "covered": 22, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/interfaces/ICommitsAdapter.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/interfaces/IIssuesAdapter.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/interfaces/IPullRequestsAdapter.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/interfaces/IReleaseAdapter.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/types/Commit.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/types/Issue.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/types/Person.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/types/PullRequest.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  },
+  "/Users/sten.johnsen/git/devops-metrics-action/src/types/Release.ts": {
+    "lines": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "functions": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "statements": {"total": 0, "covered": 0, "skipped": 0, "pct": 100},
+    "branches": {"total": 0, "covered": 0, "skipped": 0, "pct": 100}
+  }
+}

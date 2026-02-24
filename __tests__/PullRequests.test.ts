@@ -7,7 +7,7 @@ test('PullRequestsAdapter should', async () => {
   const pullRequests = new PullRequestsAdapter(process.env.GH_TOKEN, 'stenjo', [
     'dora'
   ])
-  pullRequests.getPRs = jest.fn(
+  pullRequests.getPRs = vi.fn(
     async (
       octokit: Octokit,
       repo: string,
