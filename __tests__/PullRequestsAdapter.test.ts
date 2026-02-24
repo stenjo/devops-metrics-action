@@ -19,14 +19,14 @@ const server = setupServer(
     }
   )
 )
-jest.mock('@actions/core', () => ({
-  setFailed: jest.fn()
+vi.mock('@actions/core', () => ({
+  setFailed: vi.fn()
 }))
 
 describe('PullRequest Adapter should', () => {
   beforeEach(() => {
     server.listen()
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   afterAll(() => server.close())

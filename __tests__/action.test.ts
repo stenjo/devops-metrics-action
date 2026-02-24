@@ -12,16 +12,16 @@ import type {Release} from '../src/types/Release'
 import type {PullRequest} from '../src/types/PullRequest'
 import type {Issue} from '../src/types/Issue'
 
-jest.mock('@actions/core')
-jest.mock('@actions/github')
-jest.mock('../src/ReleaseAdapter')
-jest.mock('../src/DeployFrequency')
-jest.mock('../src/ChangeFailureRate')
-jest.mock('../src/IssuesAdapter')
-jest.mock('../src/MeanTimeToRestore')
-jest.mock('../src/PullRequestsAdapter')
-jest.mock('../src/CommitsAdapter')
-jest.mock('../src/LeadTime')
+vi.mock('@actions/core')
+vi.mock('@actions/github')
+vi.mock('../src/ReleaseAdapter')
+vi.mock('../src/DeployFrequency')
+vi.mock('../src/ChangeFailureRate')
+vi.mock('../src/IssuesAdapter')
+vi.mock('../src/MeanTimeToRestore')
+vi.mock('../src/PullRequestsAdapter')
+vi.mock('../src/CommitsAdapter')
+vi.mock('../src/LeadTime')
 
 // Mocking github.context.repo as read-only
 const mockRepo = {owner: 'defaultOwner', repo: 'defaultRepo'}
@@ -31,13 +31,13 @@ Object.defineProperty(github.context, 'repo', {
 
 describe('run', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('should use the provided token input', async () => {
     const mockToken = 'provided-token'
 
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       if (name === 'token') {
         return mockToken
       }
@@ -57,7 +57,7 @@ describe('run', () => {
   it('should fall back to GH_TOKEN environment variable if token input is empty', async () => {
     const mockEnvToken = 'env-token'
 
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       if (name === 'token') {
         return ''
       }
@@ -75,7 +75,7 @@ describe('run', () => {
   it('should handle a null token input and fall back to GH_TOKEN environment variable', async () => {
     const mockEnvToken = 'env-token'
 
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       if (name === 'token') {
         return null as unknown as string // Simulate null input
       }
@@ -90,7 +90,7 @@ describe('run', () => {
     expect(process.env.GH_TOKEN).toBe(mockEnvToken)
   })
   it('should use default repo and owner when inputs are not provided', async () => {
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       switch (name) {
         case 'repo':
           return ''
@@ -107,7 +107,7 @@ describe('run', () => {
       }
     })
 
-    const coreInfoSpy = jest.spyOn(core, 'info')
+    const coreInfoSpy = vi.spyOn(core, 'info')
 
     await run()
 
@@ -116,7 +116,7 @@ describe('run', () => {
   })
 
   it('should handle multiple repositories correctly', async () => {
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       switch (name) {
         case 'repo':
           return 'repo1,repo2'
@@ -129,7 +129,7 @@ describe('run', () => {
       }
     })
 
-    const coreInfoSpy = jest.spyOn(core, 'info')
+    const coreInfoSpy = vi.spyOn(core, 'info')
 
     await run()
 
@@ -139,7 +139,7 @@ describe('run', () => {
   })
 
   it('should set correct outputs for deploy-rate, lead-time, and logs', async () => {
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       switch (name) {
         case 'repo':
           return 'repo1'
@@ -160,28 +160,28 @@ describe('run', () => {
     const mockPRs = [{}, {}] as PullRequest[] // Mock pull request objects
     const mockIssues = [{}, {}] as Issue[] // Mock issue objects
     ;(
-      ReleaseAdapter.prototype.GetAllReleasesLastMonth as jest.Mock
+      ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
     ).mockResolvedValue(mockReleases)
     ;(
-      PullRequestsAdapter.prototype.GetAllPRsLastMonth as jest.Mock
+      PullRequestsAdapter.prototype.GetAllPRsLastMonth as Mock
     ).mockResolvedValue(mockPRs)
     ;(
-      IssuesAdapter.prototype.GetAllIssuesLastMonth as jest.Mock
+      IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock
     ).mockResolvedValue(mockIssues)
-    ;(DeployFrequency.prototype.rate as jest.Mock).mockReturnValue(5)
-    ;(DeployFrequency.prototype.getLog as jest.Mock).mockReturnValue([
+    ;(DeployFrequency.prototype.rate as Mock).mockReturnValue(5)
+    ;(DeployFrequency.prototype.getLog as Mock).mockReturnValue([
       'log1',
       'log2'
     ])
-    ;(LeadTime.prototype.getLeadTime as jest.Mock).mockResolvedValue(10)
-    ;(LeadTime.prototype.getLog as jest.Mock).mockReturnValue([
+    ;(LeadTime.prototype.getLeadTime as Mock).mockResolvedValue(10)
+    ;(LeadTime.prototype.getLog as Mock).mockReturnValue([
       'leadTimeLog1',
       'leadTimeLog2'
     ])
-    ;(ChangeFailureRate.prototype.Cfr as jest.Mock).mockReturnValue(0.1)
-    ;(MeanTimeToRestore.prototype.mttr as jest.Mock).mockReturnValue(3)
+    ;(ChangeFailureRate.prototype.Cfr as Mock).mockReturnValue(0.1)
+    ;(MeanTimeToRestore.prototype.mttr as Mock).mockReturnValue(3)
 
-    const coreSetOutputSpy = jest.spyOn(core, 'setOutput')
+    const coreSetOutputSpy = vi.spyOn(core, 'setOutput')
 
     await run()
 
@@ -200,7 +200,7 @@ describe('run', () => {
   })
 
   it('should handle empty issue list case', async () => {
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       switch (name) {
         case 'repo':
           return 'repo1'
@@ -213,10 +213,10 @@ describe('run', () => {
       }
     })
     ;(
-      IssuesAdapter.prototype.GetAllIssuesLastMonth as jest.Mock
+      IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock
     ).mockResolvedValue(undefined)
 
-    const coreSetOutputSpy = jest.spyOn(core, 'setOutput')
+    const coreSetOutputSpy = vi.spyOn(core, 'setOutput')
 
     await run()
 
@@ -228,10 +228,10 @@ describe('run', () => {
   })
 
   it('should handle errors and set failure', async () => {
-    jest.spyOn(core, 'getInput').mockReturnValue('repo1')
-    const coreSetFailedSpy = jest.spyOn(core, 'setFailed')
+    vi.spyOn(core, 'getInput').mockReturnValue('repo1')
+    const coreSetFailedSpy = vi.spyOn(core, 'setFailed')
     ;(
-      ReleaseAdapter.prototype.GetAllReleasesLastMonth as jest.Mock
+      ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
     ).mockRejectedValue(new Error('Failed to fetch releases'))
 
     await run()
@@ -239,7 +239,7 @@ describe('run', () => {
     expect(coreSetFailedSpy).toHaveBeenCalledWith('Failed to fetch releases')
   })
   it("should set filtered to true when 'filtered' input is 'true'", async () => {
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       if (name === 'filtered') {
         return 'true'
       }
@@ -253,7 +253,7 @@ describe('run', () => {
   })
 
   it("should set filtered to false when 'filtered' input is 'false'", async () => {
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       if (name === 'filtered') {
         return 'false'
       }
@@ -267,7 +267,7 @@ describe('run', () => {
   })
 
   it("should set filtered to false when 'filtered' input is anything other than 'true'", async () => {
-    jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
       if (name === 'filtered') {
         return 'someOtherValue'
       }
