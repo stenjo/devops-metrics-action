@@ -54,10 +54,25 @@ jobs:
 
       - name: Extract stryker score
         run: |
-          grep "All files" out > line
-          awk '{print $4}' line > fullscore
-          awk '{split($0,a,"."); print a[1]}' fullscore > score
-          echo "stryker-score=$(tr -s '\n' < score)" >> "$GITHUB_ENV"
+          REPORT="reports/mutation/mutation.json"
+          if [ -f "$REPORT" ]; then
+            KILLED=$(jq '[.files[].mutants[] | select(.status == "Killed")] | length' "$REPORT")
+            TIMEOUT=$(jq '[.files[].mutants[] | select(.status == "Timeout")] | length' "$REPORT")
+            SURVIVED=$(jq '[.files[].mutants[] | select(.status == "Survived")] | length' "$REPORT")
+            NOCOV=$(jq '[.files[].mutants[] | select(.status == "NoCoverage")] | length' "$REPORT")
+            TOTAL=$((KILLED + TIMEOUT + SURVIVED + NOCOV))
+            if [ "$TOTAL" -gt 0 ]; then
+              SCORE=$(echo "scale=2; ($KILLED + $TIMEOUT) * 100 / $TOTAL" | bc -l | awk '{split($0,a,"."); print a[1]}')
+            else
+              SCORE=0
+            fi
+          else
+            echo "::warning::Stryker JSON report not found, falling back to text parsing"
+            SCORE=$(grep "All files" out | awk '{print $4}' | awk '{split($0,a,"."); print a[1]}')
+            SCORE=${SCORE:-0}
+          fi
+          echo "stryker-score=$SCORE" >> "$GITHUB_ENV"
+          echo "Mutation score: $SCORE%"
 
       - name: Create the Badge for Stryker Score
         if: github.ref == 'refs/heads/main'
