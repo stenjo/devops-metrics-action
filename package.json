@@ -42,7 +42,7 @@
     "@actions/core": "^3.0.0",
     "@actions/github": "^9.0.0",
     "@octokit/core": "^7.0.6",
-    "octokit": "^4.0.2"
+    "octokit": "^5.0.5"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.5.1",
