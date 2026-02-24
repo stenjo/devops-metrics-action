@@ -5,7 +5,7 @@ import * as dotenv from 'dotenv'
 
 dotenv.config()
 
-describe('Real Issues API should', () => {
+describe.skipIf(!process.env.GH_TOKEN)('Real Issues API should', () => {
   const issueAdapter = new IssuesAdapter(process.env.GH_TOKEN, 'stenjo', [
     'dora'
   ])
@@ -30,7 +30,7 @@ describe('mocked Issues API should', () => {
 
 function mockedGetIssuesReturns(file: string): void {
   // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-  const getIssuesMock = jest.spyOn(IssuesAdapter.prototype as any, 'getIssues')
+  const getIssuesMock = vi.spyOn(IssuesAdapter.prototype as any, 'getIssues')
   getIssuesMock.mockImplementation(async (): Promise<Issue[]> => {
     return Promise.resolve(
       JSON.parse(fs.readFileSync(file).toString()) as Issue[]

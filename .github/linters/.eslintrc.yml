@@ -1,11 +1,21 @@
 env:
   node: true
   es6: true
-  jest: true
 
 globals:
   Atomics: readonly
   SharedArrayBuffer: readonly
+  # Vitest globals (globals: true in vitest.config.ts)
+  describe: readonly
+  it: readonly
+  test: readonly
+  expect: readonly
+  vi: readonly
+  beforeEach: readonly
+  afterEach: readonly
+  beforeAll: readonly
+  afterAll: readonly
+  Mock: readonly
 
 ignorePatterns:
   - '!.*'
@@ -13,6 +23,7 @@ ignorePatterns:
   - '**/dist/.*'
   - '**/coverage/.*'
   - '*.json'
+  - 'vitest.config.ts'
 
 parser: '@typescript-eslint/parser'
 
@@ -24,7 +35,6 @@ parserOptions:
     - './tsconfig.json'
 
 plugins:
-  - jest
   - filenames
   - '@typescript-eslint'
 
@@ -33,7 +43,6 @@ extends:
   - plugin:@typescript-eslint/eslint-recommended
   - plugin:@typescript-eslint/recommended
   - plugin:github/recommended
-  - plugin:jest/recommended
 
 rules:
   {

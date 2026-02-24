@@ -2,16 +2,16 @@
 
 [![CodeQL](https://github.com/stenjo/devops-metrics-action/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/stenjo/devops-metrics-action/actions/workflows/codeql-analysis.yml)
 [![units-test](https://github.com/stenjo/devops-metrics-action/actions/workflows/test.yml/badge.svg)](https://github.com/stenjo/devops-metrics-action/actions/workflows/test.yml)
-![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/stenjo/9ce1ad7d8e9db99796e782b244eefa4a/raw/devops_metrics__main.json)
-![Stryker-JS](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/stenjo/9ce1ad7d8e9db99796e782b244eefa4a/raw/dora-stryker.json)
+![Coverage Badge](badges/coverage.svg)
+![Stryker-JS](badges/stryker.svg)
 
 This GitHub Action will calculate a set of DevOps Research and Assessment (DORA)
 metrics based on status and dates from commits and issues.
 
-![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/stenjo/ebb0efc5ab5afb32eae4d0cdc60d563a/raw/deploy-rate.json)
-![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/stenjo/ebb0efc5ab5afb32eae4d0cdc60d563a/raw/lead-time.json)
-![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/stenjo/ebb0efc5ab5afb32eae4d0cdc60d563a/raw/change-failure-rate.json)
-![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/stenjo/ebb0efc5ab5afb32eae4d0cdc60d563a/raw/mean-time-to-restore.json)
+![Deploy Rate](badges/deploy-rate.svg)
+![Lead Time](badges/lead-time.svg)
+![Change Failure Rate](badges/change-failure-rate.svg)
+![Mean Time to Restore](badges/mean-time-to-restore.svg)
 
 ## Inputs
 

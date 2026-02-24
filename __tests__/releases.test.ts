@@ -16,7 +16,7 @@ describe('Mocked Release API should', () => {
 })
 
 function mockedGetReleasesReturns(file: string): void {
-  const getIssuesMock = jest.spyOn(
+  const getIssuesMock = vi.spyOn(
     // biome-ignore lint/suspicious/noExplicitAny: <explanation>
     // eslint-disable-next-line  @typescript-eslint/no-explicit-any
     ReleaseAdapter.prototype as any,

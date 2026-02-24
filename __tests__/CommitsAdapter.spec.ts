@@ -3,24 +3,24 @@ import {Octokit} from '@octokit/core'
 import * as core from '@actions/core'
 import type {Commit} from '../src/types/Commit'
 
-jest.mock('@octokit/core')
-jest.mock('@actions/core')
+vi.mock('@octokit/core')
+vi.mock('@actions/core')
 
 describe('CommitsAdapter', () => {
   const token = 'test-token'
   let adapter: CommitsAdapter
-  let mockRequest: jest.Mock
+  let mockRequest: Mock
 
   beforeEach(() => {
-    mockRequest = jest.fn()
-    ;(Octokit as unknown as jest.Mock).mockImplementation(() => ({
-      request: mockRequest
-    }))
+    mockRequest = vi.fn()
+    ;(Octokit as unknown as Mock).mockImplementation(function () {
+      return {request: mockRequest}
+    })
     adapter = new CommitsAdapter(token)
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('should initialize with the correct token', () => {
@@ -74,23 +74,14 @@ describe('CommitsAdapter', () => {
     // Test with missing headers
     await expect(adapter.getCommitsFromUrl(url)).resolves.toBeDefined()
 
-    // Test with incorrect headers (empty object)
+    // Test with incorrect headers - error is caught and setFailed is called
     mockRequest.mockClear()
     mockRequest.mockImplementation(() => {
       throw new Error('Incorrect headers')
     })
-    await expect(adapter.getCommitsFromUrl(url)).rejects.toThrow(
-      'Incorrect headers'
-    )
-
-    // Test with incorrect headers (empty value)
-    mockRequest.mockClear()
-    mockRequest.mockImplementation(() => {
-      throw new Error('Incorrect headers')
-    })
-    await expect(adapter.getCommitsFromUrl(url)).rejects.toThrow(
-      'Incorrect headers'
-    )
+    const result = await adapter.getCommitsFromUrl(url)
+    expect(result).toBeUndefined()
+    expect(core.setFailed).toHaveBeenCalledWith('Incorrect headers')
   })
 
   it('should handle errors during API call', async () => {
@@ -106,9 +97,11 @@ describe('CommitsAdapter', () => {
 
   it('should handle empty or invalid URL', async () => {
     const url = ''
+    mockRequest.mockRejectedValue(new Error('Invalid URL'))
     const commits = await adapter.getCommitsFromUrl(url)
 
-    expect(mockRequest).not.toHaveBeenCalled()
+    expect(mockRequest).toHaveBeenCalled()
+    expect(core.setFailed).toHaveBeenCalledWith('Invalid URL')
     expect(commits).toBeUndefined()
   })
 
