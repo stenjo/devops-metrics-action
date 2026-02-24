@@ -1,4 +1,4 @@
-import { createRequire as __WEBPACK_EXTERNAL_createRequire } from "module";
+import './sourcemap-register.cjs';import { createRequire as __WEBPACK_EXTERNAL_createRequire } from "module";
 /******/ var __webpack_modules__ = ({
 
 /***/ 4914:
@@ -33517,3 +33517,5 @@ run();
 
 var __webpack_exports__run = __webpack_exports__.e;
 export { __webpack_exports__run as run };
+
+//# sourceMappingURL=index.js.map
