@@ -165,9 +165,9 @@ describe('run', () => {
     ;(
       PullRequestsAdapter.prototype.GetAllPRsLastMonth as Mock
     ).mockResolvedValue(mockPRs)
-    ;(
-      IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock
-    ).mockResolvedValue(mockIssues)
+    ;(IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock).mockResolvedValue(
+      mockIssues
+    )
     ;(DeployFrequency.prototype.rate as Mock).mockReturnValue(5)
     ;(DeployFrequency.prototype.getLog as Mock).mockReturnValue([
       'log1',
@@ -212,9 +212,9 @@ describe('run', () => {
           return ''
       }
     })
-    ;(
-      IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock
-    ).mockResolvedValue(undefined)
+    ;(IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock).mockResolvedValue(
+      undefined
+    )
 
     const coreSetOutputSpy = vi.spyOn(core, 'setOutput')
 
