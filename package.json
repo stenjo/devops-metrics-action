@@ -58,7 +58,7 @@
       "^.+\\.js$": "babel-jest"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(@octokit|universal-user-agent|before-after-hook)/)"
+      "node_modules/(?!(@octokit|universal-user-agent|before-after-hook|until-async)/)"
     ],
     "coverageReporters": [
       "json-summary",
