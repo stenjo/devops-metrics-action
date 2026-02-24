@@ -1,0 +1,51 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/sten.johnsen/git/devops-metrics-action[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m __tests__/DeployFrequency.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m __tests__/MeanTimeToRestore.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m __tests__/ChangeFailureRate.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m __tests__/LeadTime.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m __tests__/CommitsAdapter.spec.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m __tests__/issues.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m __tests__/action.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m __tests__/PullRequestsAdapter.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m __tests__/ReleaseAdapter.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m __tests__/IssuesAdapter.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m __tests__/CommitsAdapter.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m __tests__/Commits.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m __tests__/PullRequests.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m __tests__/releases.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m14 passed[39m[22m[90m (14)[39m
+[2m      Tests [22m [1m[32m100 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (101)[39m
+[2m   Start at [22m 08:53:26
+[2m   Duration [22m 516ms[2m (transform 371ms, setup 0ms, import 2.29s, tests 148ms, environment 1ms)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |     100 |    98.29 |     100 |     100 |                   
+ src               |     100 |    98.29 |     100 |     100 |                   
+  ...ailureRate.ts |     100 |      100 |     100 |     100 |                   
+  ...itsAdapter.ts |     100 |      100 |     100 |     100 |                   
+  ...yFrequency.ts |     100 |     90.9 |     100 |     100 | 23                
+  IssuesAdapter.ts |     100 |      100 |     100 |     100 |                   
+  LeadTime.ts      |     100 |    96.55 |     100 |     100 | 59                
+  ...eToRestore.ts |     100 |      100 |     100 |     100 |                   
+  ...stsAdapter.ts |     100 |      100 |     100 |     100 |                   
+  ...aseAdapter.ts |     100 |      100 |     100 |     100 |                   
+  index.ts         |     100 |      100 |     100 |     100 |                   
+ src/interfaces    |       0 |        0 |       0 |       0 |                   
+  ...itsAdapter.ts |       0 |        0 |       0 |       0 |                   
+  ...uesAdapter.ts |       0 |        0 |       0 |       0 |                   
+  ...stsAdapter.ts |       0 |        0 |       0 |       0 |                   
+  ...aseAdapter.ts |       0 |        0 |       0 |       0 |                   
+ src/types         |       0 |        0 |       0 |       0 |                   
+  Commit.ts        |       0 |        0 |       0 |       0 |                   
+  Issue.ts         |       0 |        0 |       0 |       0 |                   
+  Person.ts        |       0 |        0 |       0 |       0 |                   
+  PullRequest.ts   |       0 |        0 |       0 |       0 |                   
+  Release.ts       |       0 |        0 |       0 |       0 |                   
+-------------------|---------|----------|---------|---------|-------------------

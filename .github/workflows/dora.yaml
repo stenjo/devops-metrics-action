@@ -8,7 +8,7 @@ on:
     - cron: '30 0 * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   update-metrics:
@@ -51,130 +51,71 @@ jobs:
         uses: dcarbone/install-jq-action@v3.0.1
 
       # Store Deploy Rate history
-      - name: Get deploys Gist
-        run: curl -O
-          https://gist.githubusercontent.com/stenjo/73bb1ba5fe7f17151197d27cfe2d9b41/raw/deploy-rate.json
-
-      - name: Get gist deploys update status
+      - name: Load deploy rate history
         run: |
-          deploys=$(jq '[.[]| select(.date == "${{ steps.date.outputs.date }}")] | length > 0' deploy-rate.json)
-          echo "depl_exists=$deploys" >> "$GITHUB_ENV"
-          mv deploy-rate.json tmp/deploy-rate.json
+          cp data/deploy-rate.json tmp/deploy-rate.json 2>/dev/null || echo '[]' > tmp/deploy-rate.json
 
-      - name: Update json file if date already recorded
-        if: ${{ env.depl_exists == 'true' }}
+      - name: Update deploy rate history
         run: |
-          jq '(.[] | select(.date == "${{ steps.date.outputs.date }}") ).rate |= "${{ steps.dora.outputs.deploy-rate }}"' tmp/deploy-rate.json >> deploy-rate.json
-
-      - name: Store in json file if date is not recorded
-        if: ${{ env.depl_exists == 'false' }}
-        run: |
-          jq '.[. | length] |= . + {"date":"${{ steps.date.outputs.date }}", "rate":"${{ steps.dora.outputs.deploy-rate }}", "target":"7"}' tmp/deploy-rate.json >> deploy-rate.json
-
-      - name: Get existing deploy history
-        uses: popsiclestick/gist-sync-action@v1.2.0
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gist_url: https://gist.github.com/stenjo/73bb1ba5fe7f17151197d27cfe2d9b41
-          gist_title: deploy-rate.json
-          gist_description: Deploy rate
-          github_file: ./deploy-rate.json
+          DATE="${{ steps.date.outputs.date }}"
+          RATE="${{ steps.dora.outputs.deploy-rate }}"
+          if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/deploy-rate.json > /dev/null 2>&1; then
+            jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/deploy-rate.json > data/deploy-rate.json
+          else
+            jq ".[. | length] |= . + {\"date\":\"$DATE\", \"rate\":\"$RATE\", \"target\":\"7\"}" tmp/deploy-rate.json > data/deploy-rate.json
+          fi
 
       # Store Lead Time history
-      - name: Get lead-time Gist
-        run: curl -O
-          https://gist.githubusercontent.com/stenjo/73bb1ba5fe7f17151197d27cfe2d9b41/raw/lead-time.json
-
-      - name: Get gist deploys update status
+      - name: Load lead time history
         run: |
-          deploys=$(jq '[.[]| select(.date == "${{ steps.date.outputs.date }}")] | length > 0' lead-time.json)
-          echo "lt_exists=$deploys" >> "$GITHUB_ENV"
-          mv lead-time.json tmp/lead-time.json
+          cp data/lead-time.json tmp/lead-time.json 2>/dev/null || echo '[]' > tmp/lead-time.json
 
-      - name: Update json file if date already recorded
-        if: ${{ env.lt_exists == 'true' }}
+      - name: Update lead time history
         run: |
-          jq '(.[] | select(.date == "${{ steps.date.outputs.date }}") ).rate |= "${{ steps.dora.outputs.lead-time }}"' tmp/lead-time.json >> lead-time.json
+          DATE="${{ steps.date.outputs.date }}"
+          RATE="${{ steps.dora.outputs.lead-time }}"
+          if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/lead-time.json > /dev/null 2>&1; then
+            jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/lead-time.json > data/lead-time.json
+          else
+            jq ".[. | length] |= . + {\"date\":\"$DATE\", \"rate\":\"$RATE\", \"target\":\"7\"}" tmp/lead-time.json > data/lead-time.json
+          fi
 
-      - name: Store in json file if date is not recorded
-        if: ${{ env.depl_exists == 'false' }}
+      # Store Change Failure Rate history
+      - name: Load change failure rate history
         run: |
-          jq '.[. | length] |= . + {"date":"${{ steps.date.outputs.date }}", "rate":"${{ steps.dora.outputs.lead-time }}", "target":"7"}' tmp/lead-time.json >> lead-time.json
+          cp data/change-failure-rate.json tmp/change-failure-rate.json 2>/dev/null || echo '[]' > tmp/change-failure-rate.json
 
-      - name: Get existing deploy history
-        uses: popsiclestick/gist-sync-action@v1.2.0
-        id: sync-lead-time
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gist_url: https://gist.github.com/stenjo/73bb1ba5fe7f17151197d27cfe2d9b41
-          gist_title: lead-time.json
-          gist_description: Lead time
-          github_file: ./lead-time.json
-
-      # Store Change Failure Rate
-      - name: Gist Actions
-        id: gist-cfr
-        run: curl -O
-          https://gist.githubusercontent.com/stenjo/73bb1ba5fe7f17151197d27cfe2d9b41/raw/change-failure-rate.json
-
-      - name: Get gist update status
-        id: gist-cfr-status
+      - name: Update change failure rate history
         run: |
-          cfrs=$(jq '[.[]| select(.date == "${{ steps.date.outputs.date }}")] | length > 0' change-failure-rate.json)
-          echo "cfr_exists=$cfrs" >> "$GITHUB_ENV"
-          mv change-failure-rate.json tmp/change-failure-rate.json
-          ls -al tmp
+          DATE="${{ steps.date.outputs.date }}"
+          RATE="${{ steps.dora.outputs.change-failure-rate }}"
+          if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/change-failure-rate.json > /dev/null 2>&1; then
+            jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/change-failure-rate.json > data/change-failure-rate.json
+          else
+            jq ".[. | length] |= . + {\"date\":\"$DATE\", \"rate\":\"$RATE\", \"target\":\"15\"}" tmp/change-failure-rate.json > data/change-failure-rate.json
+          fi
 
-      - name: Update json file if date already recorded
-        if: ${{ env.cfr_exists == 'true' }}
+      # Store Mean Time to Restore history
+      - name: Load MTTR history
         run: |
-          jq '(.[] | select(.date == "${{ steps.date.outputs.date }}") ).rate |= "${{ steps.dora.outputs.change-failure-rate }}"' tmp/change-failure-rate.json >> change-failure-rate.json
+          cp data/mttr.json tmp/mttr.json 2>/dev/null || echo '[]' > tmp/mttr.json
 
-      - name: Store in json file if date is not recorded
-        if: ${{ env.cfr_exists == 'false' }}
+      - name: Update MTTR history
         run: |
-          jq '.[. | length] |= . + {"date":"${{ steps.date.outputs.date }}", "rate":"${{ steps.dora.outputs.change-failure-rate }}", "target":"15"}' tmp/change-failure-rate.json >> change-failure-rate.json
+          DATE="${{ steps.date.outputs.date }}"
+          RATE="${{ steps.dora.outputs.mttr }}"
+          if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/mttr.json > /dev/null 2>&1; then
+            jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/mttr.json > data/mttr.json
+          else
+            jq ".[. | length] |= . + {\"date\":\"$DATE\", \"rate\":\"$RATE\", \"target\":\"1\"}" tmp/mttr.json > data/mttr.json
+          fi
 
-      - name: Get existing deploy history
-        uses: popsiclestick/gist-sync-action@v1.2.0
-        id: sync-cfr
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gist_url: https://gist.github.com/stenjo/73bb1ba5fe7f17151197d27cfe2d9b41
-          gist_title: change-failure-rate.json
-          gist_description: Change failure rate
-          github_file: ./change-failure-rate.json
-
-      # Store Mean time to Repair
-      - name: Get MTTR Gist
-        id: gist-mttr
-        run: curl -O
-          https://gist.githubusercontent.com/stenjo/73bb1ba5fe7f17151197d27cfe2d9b41/raw/mttr.json
-
-      - name: Get mttr gist update status
-        id: gist-mttr-status
+      - name: Commit DORA history data
         run: |
-          mttrs=$(jq '[.[]| select(.date == "${{ steps.date.outputs.date }}")] | length > 0' mttr.json)
-          echo "mttr_exists=$mttrs" >> "$GITHUB_ENV"
-          mv mttr.json tmp/mttr.json
-          ls -al tmp
-
-      - name: Update json file if date already recorded
-        if: ${{ env.mttr_exists == 'true' }}
-        run: |
-          jq '(.[] | select(.date == "${{ steps.date.outputs.date }}") ).rate |= "${{ steps.dora.outputs.mttr }}"' tmp/mttr.json >> mttr.json
-
-      - name: Store in json file if date is not recorded
-        if: ${{ env.mttr_exists == 'false' }}
-        run: |
-          jq '.[. | length] |= . + {"date":"${{ steps.date.outputs.date }}", "rate":"${{ steps.dora.outputs.mttr }}", "target":"1"}' tmp/mttr.json >> mttr.json
-
-      - name: Save MTTR history
-        uses: popsiclestick/gist-sync-action@v1.2.0
-        id: sync-mttr
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gist_url: https://gist.github.com/stenjo/73bb1ba5fe7f17151197d27cfe2d9b41
-          gist_title: mttr.json
-          gist_description: Mean time to recover
-          github_file: ./mttr.json
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add data/deploy-rate.json data/lead-time.json data/change-failure-rate.json data/mttr.json
+          if ! git diff --staged --quiet; then
+            git commit -m "Update DORA metric history [skip ci]"
+            git push
+          fi

@@ -59,17 +59,29 @@ jobs:
           awk '{split($0,a,"."); print a[1]}' fullscore > score
           echo "stryker-score=$(tr -s '\n' < score)" >> "$GITHUB_ENV"
 
-      - name: Create the Badge for Deploy Rate
-        uses: Schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gistID: 9ce1ad7d8e9db99796e782b244eefa4a
-          filename: dora-stryker.json
-          label: Stryker score
-          message: ${{ env.stryker-score }}%
-          minColorRange: 50
-          maxColorRange: 90
-          valColorRange: ${{ env.stryker-score }}
+      - name: Create the Badge for Stryker Score
+        if: github.ref == 'refs/heads/main'
+        run: |
+          SCORE=${{ env.stryker-score }}
+          if [ "$SCORE" -ge 90 ]; then COLOR="brightgreen";
+          elif [ "$SCORE" -ge 80 ]; then COLOR="green";
+          elif [ "$SCORE" -ge 70 ]; then COLOR="yellowgreen";
+          elif [ "$SCORE" -ge 60 ]; then COLOR="yellow";
+          elif [ "$SCORE" -ge 50 ]; then COLOR="orange";
+          else COLOR="red"; fi
+          mkdir -p badges
+          curl -s "https://img.shields.io/badge/Stryker%20score-${SCORE}%25-${COLOR}" > badges/stryker.svg
+
+      - name: Commit badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add badges/stryker.svg
+          if ! git diff --staged --quiet; then
+            git commit -m "Update Stryker score badge [skip ci]"
+            git push
+          fi
 
       - name: Upload results
         uses: actions/upload-artifact@v4

@@ -8,7 +8,7 @@ on:
     - cron: '30 0 * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   update-metrics:
@@ -43,53 +43,48 @@ jobs:
       - name: Get the mean time to restore
         run: echo "The mean time to restore was ${{ steps.dora.outputs.mttr }}"
 
-      - name: Create the Badge for Deploy Rate
-        uses: Schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gistID: ebb0efc5ab5afb32eae4d0cdc60d563a
-          filename: deploy-rate.json
-          label: Deploy Rate
-          message: ${{ steps.dora.outputs.deploy-rate }}
-          valColorRange: ${{ steps.dora.outputs.deploy-rate }}
-          maxColorRange: 7
-          minColorRange: 1
+      - name: Generate DORA badges
+        run: |
+          mkdir -p badges
 
-      - name: Create the Badge for Lead Time
-        uses: Schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gistID: ebb0efc5ab5afb32eae4d0cdc60d563a
-          filename: lead-time.json
-          label: Lead Time
-          message: ${{ steps.dora.outputs.lead-time }}
-          valColorRange: ${{ steps.dora.outputs.lead-time }}
-          maxColorRange: 7
-          minColorRange: 3
-          invertColorRange: true
+          # Deploy Rate badge (higher is better: green >= 7, yellow >= 4, orange >= 1)
+          RATE="${{ steps.dora.outputs.deploy-rate }}"
+          if [ "$(echo "$RATE >= 7" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
+          elif [ "$(echo "$RATE >= 4" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
+          elif [ "$(echo "$RATE >= 1" | bc -l)" -eq 1 ]; then COLOR="yellow";
+          else COLOR="red"; fi
+          curl -s "https://img.shields.io/badge/Deploy%20Rate-${RATE}-${COLOR}" > badges/deploy-rate.svg
 
-      - name: Create the Badge for Change Failure Rate
-        uses: Schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gistID: ebb0efc5ab5afb32eae4d0cdc60d563a
-          filename: change-failure-rate.json
-          label: Change Failure Rate
-          message: ${{ steps.dora.outputs.change-failure-rate }}%
-          valColorRange: ${{ steps.dora.outputs.change-failure-rate }}
-          maxColorRange: 15
-          minColorRange: 1
-          invertColorRange: true
+          # Lead Time badge (lower is better: green <= 3, yellow <= 5, orange <= 7)
+          LT="${{ steps.dora.outputs.lead-time }}"
+          if [ "$(echo "$LT <= 3" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
+          elif [ "$(echo "$LT <= 5" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
+          elif [ "$(echo "$LT <= 7" | bc -l)" -eq 1 ]; then COLOR="yellow";
+          else COLOR="red"; fi
+          curl -s "https://img.shields.io/badge/Lead%20Time-${LT}-${COLOR}" > badges/lead-time.svg
 
-      - name: Create the Badge for Mean time to Restore
-        uses: Schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_AUTH_TOKEN }}
-          gistID: ebb0efc5ab5afb32eae4d0cdc60d563a
-          filename: mean-time-to-restore.json
-          label: Mean time to Restore
-          message: ${{ steps.dora.outputs.mttr }}
-          valColorRange: ${{ steps.dora.outputs.mttr }}
-          maxColorRange: 3
-          minColorRange: 1
-          invertColorRange: true
+          # Change Failure Rate badge (lower is better: green <= 1, yellow <= 8, orange <= 15)
+          CFR="${{ steps.dora.outputs.change-failure-rate }}"
+          if [ "$(echo "$CFR <= 1" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
+          elif [ "$(echo "$CFR <= 8" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
+          elif [ "$(echo "$CFR <= 15" | bc -l)" -eq 1 ]; then COLOR="yellow";
+          else COLOR="red"; fi
+          curl -s "https://img.shields.io/badge/Change%20Failure%20Rate-${CFR}%25-${COLOR}" > badges/change-failure-rate.svg
+
+          # Mean Time to Restore badge (lower is better: green <= 1, yellow <= 2, orange <= 3)
+          MTTR="${{ steps.dora.outputs.mttr }}"
+          if [ "$(echo "$MTTR <= 1" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
+          elif [ "$(echo "$MTTR <= 2" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
+          elif [ "$(echo "$MTTR <= 3" | bc -l)" -eq 1 ]; then COLOR="yellow";
+          else COLOR="red"; fi
+          curl -s "https://img.shields.io/badge/Mean%20Time%20to%20Restore-${MTTR}-${COLOR}" > badges/mean-time-to-restore.svg
+
+      - name: Commit badges
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add badges/deploy-rate.svg badges/lead-time.svg badges/change-failure-rate.svg badges/mean-time-to-restore.svg
+          if ! git diff --staged --quiet; then
+            git commit -m "Update DORA metric badges [skip ci]"
+            git push
+          fi
