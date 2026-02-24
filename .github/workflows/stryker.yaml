@@ -114,6 +114,7 @@ jobs:
         shell: /usr/bin/bash -e {0}
 
       - name: Add formatted table to PR comment
+        if: hashFiles('stryker-report.md') != ''
         uses: mshick/add-pr-comment@v2
         with:
           message-path: stryker-report.md
@@ -123,6 +124,7 @@ jobs:
           message-id: 'add-pr-stryker-comment-${{ github.event.pull_request.number }}'
 
       - name: Deploy HTML Report to GitHub Pages
+        if: hashFiles('reports/mutation/mutation.html') != ''
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
