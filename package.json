@@ -58,7 +58,7 @@
     "dotenv": "^16.4.5",
     "eslint": "^8.57.0",
     "eslint-import-resolver-typescript": "^4.4.4",
-    "eslint-plugin-github": "^5.0.1",
+    "eslint-plugin-github": "^6.0.0",
     "eslint-plugin-jsonc": "^2.16.0",
     "eslint-plugin-prettier": "^5.5.5",
     "graphql": "^16.12.0",
