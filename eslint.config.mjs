@@ -1,51 +1,43 @@
-import jest from 'eslint-plugin-jest'
-import filenames from 'eslint-plugin-filenames'
 import typescriptEslint from '@typescript-eslint/eslint-plugin'
-import globals from 'globals'
 import tsParser from '@typescript-eslint/parser'
-import path from 'node:path'
-import {fileURLToPath} from 'node:url'
-import js from '@eslint/js'
-import {FlatCompat} from '@eslint/eslintrc'
+import github from 'eslint-plugin-github'
+import globals from 'globals'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-  allConfig: js.configs.all
-})
+const githubFlat = github.getFlatConfigs()
 
 export default [
   {
     ignores: [
-      '!**/.*',
-      '**/node_modules/.*',
-      '**/dist/.*',
-      '**/coverage/.*',
-      '**/*.json'
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/coverage/**',
+      '**/*.json',
+      'vitest.config.ts',
+      'eslint.config.mjs'
     ]
   },
-  ...compat.extends(
-    'eslint:recommended',
-    'plugin:@typescript-eslint/eslint-recommended',
-    'plugin:@typescript-eslint/recommended',
-    'plugin:github/recommended',
-    'plugin:jest/recommended'
-  ),
+  githubFlat.recommended,
   {
+    files: ['**/*.ts'],
     plugins: {
-      jest,
-      filenames,
       '@typescript-eslint': typescriptEslint
     },
 
     languageOptions: {
       globals: {
         ...globals.node,
-        ...globals.jest,
         Atomics: 'readonly',
-        SharedArrayBuffer: 'readonly'
+        SharedArrayBuffer: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        vi: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        Mock: 'readonly'
       },
 
       parser: tsParser,
@@ -57,9 +49,15 @@ export default [
       }
     },
 
+    settings: {
+      'import/resolver': {
+        typescript: true
+      }
+    },
+
     rules: {
       camelcase: 'off',
-      'filenames/match': [2, '^[A-Za-z_.]+$'],
+      'github/filenames-match-regex': [2, '^[A-Za-z_.]+$'],
       'eslint-comments/no-use': 'off',
       'eslint-comments/no-unused-disable': 'off',
       'i18n-text/no-en': 'off',
@@ -67,7 +65,6 @@ export default [
       'no-console': 'off',
       'no-unused-vars': 'off',
       'prettier/prettier': 'error',
-      semi: 'off',
       '@typescript-eslint/array-type': 'error',
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/ban-ts-comment': 'error',
@@ -87,7 +84,6 @@ export default [
         }
       ],
 
-      '@typescript-eslint/func-call-spacing': ['error', 'never'],
       '@typescript-eslint/no-array-constructor': 'error',
       '@typescript-eslint/no-empty-interface': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
@@ -110,9 +106,7 @@ export default [
       '@typescript-eslint/promise-function-async': 'error',
       '@typescript-eslint/require-array-sort-compare': 'error',
       '@typescript-eslint/restrict-plus-operands': 'error',
-      '@typescript-eslint/semi': ['error', 'never'],
       '@typescript-eslint/space-before-function-paren': 'off',
-      '@typescript-eslint/type-annotation-spacing': 'error',
       '@typescript-eslint/unbound-method': 'error'
     }
   }
