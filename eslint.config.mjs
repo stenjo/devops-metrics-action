@@ -1,6 +1,7 @@
 import typescriptEslint from '@typescript-eslint/eslint-plugin'
 import tsParser from '@typescript-eslint/parser'
 import github from 'eslint-plugin-github'
+import globals from 'globals'
 
 const githubFlat = github.getFlatConfigs()
 
@@ -12,17 +13,19 @@ export default [
       '**/coverage/**',
       '**/*.json',
       'vitest.config.ts',
-      '.github/linters/eslint.config.mjs'
+      'eslint.config.mjs'
     ]
   },
   githubFlat.recommended,
   {
+    files: ['**/*.ts'],
     plugins: {
       '@typescript-eslint': typescriptEslint
     },
 
     languageOptions: {
       globals: {
+        ...globals.node,
         Atomics: 'readonly',
         SharedArrayBuffer: 'readonly',
         describe: 'readonly',
