@@ -119,8 +119,10 @@ def main(file: str, out_file: str, url: str):
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
-        print("Usage: python generate_stryker_report.py \
-            <input_json_file> <output_md_file> <base_url>")
+        print(
+            "Usage: python generate_stryker_report.py \
+            <input_json_file> <output_md_file> <base_url>"
+        )
         sys.exit(1)
 
     input_file = sys.argv[1]
