@@ -15,17 +15,19 @@ jobs:
     runs-on: ubuntu-latest
     name: Checking the dora metrics
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         id: setup-node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version-file: .node-version
           cache: npm
 
       - name: Dora metrics
-        uses: stenjo/devops-metrics-action@v1
+        uses: stenjo/devops-metrics-action@a3190f13e1263421031b1ae6d42337a765e31653 # v1
         id: dora
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -48,7 +50,7 @@ jobs:
           mkdir tmp
 
       - name: Install jq
-        uses: dcarbone/install-jq-action@v3.2.0
+        uses: dcarbone/install-jq-action@b7ef57d46ece78760b4019dbc4080a1ba2a40b45 # v3.2.0
 
       # Store Deploy Rate history
       - name: Load deploy rate history

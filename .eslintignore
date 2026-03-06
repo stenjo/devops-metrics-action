@@ -1,5 +1,0 @@
-dist/
-lib/
-node_modules/
-coverage/
-jest.config.ts

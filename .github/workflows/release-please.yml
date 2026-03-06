@@ -13,13 +13,15 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - uses: google-github-actions/release-please-action@a017ec70c7f1401744d60197f7577a0c51c8c1cf # v4
         id: release
         with:
           release-type: simple
           package-name: release-please-action
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: tag major and minor versions
         if: ${{ steps.release.outputs.release_created }}

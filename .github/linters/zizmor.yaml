@@ -1,0 +1,13 @@
+---
+rules:
+  template-injection:
+    ignore:
+      - badges.yaml
+      - ci.yml
+      - dora.yaml
+      - release-please.yml
+      - stryker.yaml
+      - test.yml
+  cache-poisoning:
+    ignore:
+      - test.yml

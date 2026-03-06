@@ -47,7 +47,7 @@ Access token for the repository.
 
 ### `logging`
 
-Set to true to make event logs of metrics source avaiable.
+Set to true to make event logs of metrics source available.
 
 ### `filtered`
 

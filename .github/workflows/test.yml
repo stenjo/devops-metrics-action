@@ -7,22 +7,26 @@ on:
       - 'releases/*'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   # unit tests
   units:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         id: setup-node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version-file: .node-version
           cache: npm
@@ -34,11 +38,11 @@ jobs:
 
       - name: Get branch name
         id: branch-name
-        uses: tj-actions/branch-names@v9
+        uses: tj-actions/branch-names@5250492686b253f06fa55861556d1027b067aeb5 # v9
 
       - name: Vitest Coverage Comment
         id: coverageComment
-        uses: MishaKav/jest-coverage-comment@main
+        uses: MishaKav/jest-coverage-comment@d1a95e365f7f60e1438b5b36198b8c23e9ea4d59 # main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           summary-title: Vitest Coverage (summary)
@@ -89,7 +93,7 @@ jobs:
 
       - name: Add PR Comment with coverage diff
         if: steps.branch-name.outputs.current_branch != 'main'
-        uses: mshick/add-pr-comment@v2
+        uses: mshick/add-pr-comment@c96a9caed2a8cc0ed55e1f105725e383d63569d0 # v2
         with:
           message-path: coverage.md
           update-only: false
@@ -101,7 +105,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - uses: ./
         id: dora
         with:
@@ -119,7 +125,7 @@ jobs:
           printf "${{ steps.dora.outputs.deploy-rate-log }}" > deploy-rate-log.txt
           echo "The lead time was ${{ steps.dora.outputs.lead-time }}"      # Use the output from the `dora` step
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: logs
           path: ./*-log.txt
