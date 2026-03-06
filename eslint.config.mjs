@@ -58,6 +58,7 @@ export default [
     rules: {
       camelcase: 'off',
       'github/filenames-match-regex': [2, '^[A-Za-z_.]+$'],
+      'n/no-missing-import': 'off',
       'eslint-comments/no-use': 'off',
       'eslint-comments/no-unused-disable': 'off',
       'i18n-text/no-en': 'off',

@@ -15,17 +15,19 @@ jobs:
     runs-on: ubuntu-latest
     name: Checking the dora metrics
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         id: setup-node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version-file: .node-version
           cache: npm
 
       - name: Dora metrics
-        uses: stenjo/devops-metrics-action@v1
+        uses: stenjo/devops-metrics-action@bb636f4d5f5c7ff7f811f27e6d44d97db258500e # v1
         id: dora
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -48,7 +50,7 @@ jobs:
           mkdir tmp
 
       - name: Install jq
-        uses: dcarbone/install-jq-action@v3.2.0
+        uses: dcarbone/install-jq-action@b7ef57d46ece78760b4019dbc4080a1ba2a40b45 # v3.2.0
 
       # Store Deploy Rate history
       - name: Load deploy rate history
@@ -111,9 +113,12 @@ jobs:
           fi
 
       - name: Commit DORA history data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git add data/deploy-rate.json data/lead-time.json data/change-failure-rate.json data/mttr.json
           if ! git diff --staged --quiet; then
             git commit -m "Update DORA metric history [skip ci]"

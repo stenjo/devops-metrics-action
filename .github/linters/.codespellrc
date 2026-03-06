@@ -1,0 +1,3 @@
+[codespell]
+ignore-words-list = afterall,ans,outpu,hel
+skip = */package-lock.json,*/go.mod,*/go.sum,*.log,.git,__tests__/test-data/*
