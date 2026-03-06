@@ -113,9 +113,12 @@ jobs:
           fi
 
       - name: Commit DORA history data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git add data/deploy-rate.json data/lead-time.json data/change-failure-rate.json data/mttr.json
           if ! git diff --staged --quiet; then
             git commit -m "Update DORA metric history [skip ci]"

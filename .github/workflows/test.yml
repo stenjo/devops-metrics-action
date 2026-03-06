@@ -67,9 +67,12 @@ jobs:
 
       - name: Commit coverage badge and summary
         if: steps.branch-name.outputs.current_branch == 'main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           mkdir -p data
           cp coverage-summary.json data/coverage-summary.json
           git add badges/coverage.svg data/coverage-summary.json

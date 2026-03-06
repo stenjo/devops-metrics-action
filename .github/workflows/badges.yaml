@@ -82,9 +82,12 @@ jobs:
           curl -s "https://img.shields.io/badge/Mean%20Time%20to%20Restore-${MTTR}-${COLOR}" > badges/mean-time-to-restore.svg
 
       - name: Commit badges
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git add badges/deploy-rate.svg badges/lead-time.svg badges/change-failure-rate.svg badges/mean-time-to-restore.svg
           if ! git diff --staged --quiet; then
             git commit -m "Update DORA metric badges [skip ci]"
