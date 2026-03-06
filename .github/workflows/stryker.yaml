@@ -120,7 +120,7 @@ jobs:
 
       - name: Add formatted table to PR comment
         if: hashFiles('stryker-report.md') != ''
-        uses: mshick/add-pr-comment@c96a9caed2a8cc0ed55e1f105725e383d63569d0 # v2
+        uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc # v2.8.2
         with:
           message-path: stryker-report.md
           update-only: false

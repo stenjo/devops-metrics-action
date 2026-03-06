@@ -1,15 +1,5 @@
 ---
 rules:
-  impostor-commit:
-    ignore:
-      - badges.yaml
-      - ci.yml
-      - codeql-analysis.yml
-      - dora.yaml
-      - linter.yml
-      - release-please.yml
-      - stryker.yaml
-      - test.yml
   template-injection:
     ignore:
       - badges.yaml
