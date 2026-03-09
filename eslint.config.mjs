@@ -1,9 +1,7 @@
 import typescriptEslint from '@typescript-eslint/eslint-plugin'
 import tsParser from '@typescript-eslint/parser'
-import github from 'eslint-plugin-github'
+import prettierPlugin from 'eslint-plugin-prettier'
 import globals from 'globals'
-
-const githubFlat = github.getFlatConfigs()
 
 export default [
   {
@@ -16,11 +14,11 @@ export default [
       'eslint.config.mjs'
     ]
   },
-  githubFlat.recommended,
   {
     files: ['**/*.ts'],
     plugins: {
-      '@typescript-eslint': typescriptEslint
+      '@typescript-eslint': typescriptEslint,
+      prettier: prettierPlugin
     },
 
     languageOptions: {
@@ -49,20 +47,8 @@ export default [
       }
     },
 
-    settings: {
-      'import/resolver': {
-        typescript: true
-      }
-    },
-
     rules: {
       camelcase: 'off',
-      'github/filenames-match-regex': [2, '^[A-Za-z_.]+$'],
-      'n/no-missing-import': 'off',
-      'eslint-comments/no-use': 'off',
-      'eslint-comments/no-unused-disable': 'off',
-      'i18n-text/no-en': 'off',
-      'import/no-namespace': 'off',
       'no-console': 'off',
       'no-unused-vars': 'off',
       'prettier/prettier': 'error',
