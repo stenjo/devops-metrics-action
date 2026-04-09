@@ -27,7 +27,7 @@ jobs:
           cache: npm
 
       - name: Dora metrics
-        uses: stenjo/devops-metrics-action@bb636f4d5f5c7ff7f811f27e6d44d97db258500e # v1
+        uses: stenjo/devops-metrics-action@021fe76dbba68674a9c8191b1d4a0aee482ea44b # v1.3.1
         id: dora
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
