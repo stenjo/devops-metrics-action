@@ -6,6 +6,8 @@
     "rootDir": "./src",
     "moduleResolution": "Bundler",
     "baseUrl": "./",
+    "ignoreDeprecations": "6.0",
+    "types": ["node"],
     "sourceMap": true,
     "outDir": "./dist",
     "noImplicitAny": true,
