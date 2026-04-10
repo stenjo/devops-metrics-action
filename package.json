@@ -48,7 +48,7 @@
     "@stryker-mutator/core": "^9.6.0",
     "@stryker-mutator/typescript-checker": "^9.6.0",
     "@stryker-mutator/vitest-runner": "^9.6.0",
-    "@types/node": "^24.11.0",
+    "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.3.0",
     "@vercel/ncc": "^0.38.4",
