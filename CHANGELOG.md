@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.2](https://github.com/stenjo/devops-metrics-action/compare/v1.3.1...v1.3.2) (2026-04-13)
+
+
+### Bug Fixes
+
+* allow duplicate headings (MD024) in changelog ([cc63613](https://github.com/stenjo/devops-metrics-action/commit/cc636134cbd0e37ef8a5ad45483b4b915ea0b523))
+* resolve textlint and markdownlint errors in CHANGELOG ([07951db](https://github.com/stenjo/devops-metrics-action/commit/07951db9517ba3d15b0794c2603f341f79818342))
+* update upload-artifact SHA to match v7 tag ([bfd6b29](https://github.com/stenjo/devops-metrics-action/commit/bfd6b2952f7b3042df4e6ca97e5a79b112580bf7))
+
 ## [1.3.1](https://github.com/stenjo/devops-metrics-action/compare/v1.3.0...v1.3.1) (2026-04-07)
 
 ### Bugfixes
