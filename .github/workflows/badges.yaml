@@ -91,5 +91,9 @@ jobs:
           git add badges/deploy-rate.svg badges/lead-time.svg badges/change-failure-rate.svg badges/mean-time-to-restore.svg
           if ! git diff --staged --quiet; then
             git commit -m "Update DORA metric badges [skip ci]"
-            git push
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && break
+              echo "Push attempt $i failed, retrying..."
+              sleep 5
+            done
           fi
