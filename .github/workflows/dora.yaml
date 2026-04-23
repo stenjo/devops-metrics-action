@@ -34,14 +34,20 @@ jobs:
 
       # Use the output from the `dora` step
       - name: Get the output rate
-        run: echo "The deploy rate was ${{ steps.dora.outputs.deploy-rate }}" # Use the output from the `dora` step
+        run: echo "The deploy rate was ${STEPS_DORA_OUTPUTS_DEPLOY_RATE}" # Use the output from the `dora` step
+        env:
+          STEPS_DORA_OUTPUTS_DEPLOY_RATE: ${{ steps.dora.outputs.deploy-rate }}
       - name: Get the lead time
-        run: echo "The lead time was ${{ steps.dora.outputs.lead-time }}" # Use the output from the `dora` step
+        run: echo "The lead time was ${STEPS_DORA_OUTPUTS_LEAD_TIME}" # Use the output from the `dora` step
+        env:
+          STEPS_DORA_OUTPUTS_LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
       - name: Get the change failure rate
         run: echo "The change failure rate was ${{
           steps.dora.outputs.change-failure-rate }}"
       - name: Get the mean time to restore
-        run: echo "The mean time to restore was ${{ steps.dora.outputs.mttr }}"
+        run: echo "The mean time to restore was ${STEPS_DORA_OUTPUTS_MTTR}"
+        env:
+          STEPS_DORA_OUTPUTS_MTTR: ${{ steps.dora.outputs.mttr }}
 
       - name: Get current date
         id: date
@@ -59,13 +65,16 @@ jobs:
 
       - name: Update deploy rate history
         run: |
-          DATE="${{ steps.date.outputs.date }}"
-          RATE="${{ steps.dora.outputs.deploy-rate }}"
+          DATE="${STEPS_DATE_OUTPUTS_DATE}"
+          RATE="${STEPS_DORA_OUTPUTS_DEPLOY_RATE}"
           if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/deploy-rate.json > /dev/null 2>&1; then
             jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/deploy-rate.json > data/deploy-rate.json
           else
             jq ".[. | length] |= . + {\"date\":\"$DATE\", \"rate\":\"$RATE\", \"target\":\"7\"}" tmp/deploy-rate.json > data/deploy-rate.json
           fi
+        env:
+          STEPS_DATE_OUTPUTS_DATE: ${{ steps.date.outputs.date }}
+          STEPS_DORA_OUTPUTS_DEPLOY_RATE: ${{ steps.dora.outputs.deploy-rate }}
 
       # Store Lead Time history
       - name: Load lead time history
@@ -74,13 +83,16 @@ jobs:
 
       - name: Update lead time history
         run: |
-          DATE="${{ steps.date.outputs.date }}"
-          RATE="${{ steps.dora.outputs.lead-time }}"
+          DATE="${STEPS_DATE_OUTPUTS_DATE}"
+          RATE="${STEPS_DORA_OUTPUTS_LEAD_TIME}"
           if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/lead-time.json > /dev/null 2>&1; then
             jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/lead-time.json > data/lead-time.json
           else
             jq ".[. | length] |= . + {\"date\":\"$DATE\", \"rate\":\"$RATE\", \"target\":\"7\"}" tmp/lead-time.json > data/lead-time.json
           fi
+        env:
+          STEPS_DATE_OUTPUTS_DATE: ${{ steps.date.outputs.date }}
+          STEPS_DORA_OUTPUTS_LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
 
       # Store Change Failure Rate history
       - name: Load change failure rate history
@@ -89,13 +101,16 @@ jobs:
 
       - name: Update change failure rate history
         run: |
-          DATE="${{ steps.date.outputs.date }}"
-          RATE="${{ steps.dora.outputs.change-failure-rate }}"
+          DATE="${STEPS_DATE_OUTPUTS_DATE}"
+          RATE="${STEPS_DORA_OUTPUTS_CHANGE_FAILURE_RATE}"
           if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/change-failure-rate.json > /dev/null 2>&1; then
             jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/change-failure-rate.json > data/change-failure-rate.json
           else
             jq ".[. | length] |= . + {\"date\":\"$DATE\", \"rate\":\"$RATE\", \"target\":\"15\"}" tmp/change-failure-rate.json > data/change-failure-rate.json
           fi
+        env:
+          STEPS_DATE_OUTPUTS_DATE: ${{ steps.date.outputs.date }}
+          STEPS_DORA_OUTPUTS_CHANGE_FAILURE_RATE: ${{ steps.dora.outputs.change-failure-rate }}
 
       # Store Mean Time to Restore history
       - name: Load MTTR history
@@ -104,13 +119,16 @@ jobs:
 
       - name: Update MTTR history
         run: |
-          DATE="${{ steps.date.outputs.date }}"
-          RATE="${{ steps.dora.outputs.mttr }}"
+          DATE="${STEPS_DATE_OUTPUTS_DATE}"
+          RATE="${STEPS_DORA_OUTPUTS_MTTR}"
           if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/mttr.json > /dev/null 2>&1; then
             jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/mttr.json > data/mttr.json
           else
             jq ".[. | length] |= . + {\"date\":\"$DATE\", \"rate\":\"$RATE\", \"target\":\"1\"}" tmp/mttr.json > data/mttr.json
           fi
+        env:
+          STEPS_DATE_OUTPUTS_DATE: ${{ steps.date.outputs.date }}
+          STEPS_DORA_OUTPUTS_MTTR: ${{ steps.dora.outputs.mttr }}
 
       - name: Commit DORA history data
         env:

@@ -69,4 +69,6 @@ jobs:
 
       - name: Print Output
         id: output
-        run: echo "${{ steps.dora.outputs.deploy-rate }}"
+        run: echo "${STEPS_DORA_OUTPUTS_DEPLOY_RATE}"
+        env:
+          STEPS_DORA_OUTPUTS_DEPLOY_RATE: ${{ steps.dora.outputs.deploy-rate }}
