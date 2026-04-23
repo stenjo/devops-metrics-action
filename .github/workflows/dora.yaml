@@ -42,8 +42,9 @@ jobs:
         env:
           STEPS_DORA_OUTPUTS_LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
       - name: Get the change failure rate
-        run: echo "The change failure rate was ${{
-          steps.dora.outputs.change-failure-rate }}"
+        run: echo "The change failure rate was ${STEPS_DORA_OUTPUTS_CHANGE_FAILURE_RATE}"
+        env:
+          STEPS_DORA_OUTPUTS_CHANGE_FAILURE_RATE: ${{ steps.dora.outputs.change-failure-rate }}
       - name: Get the mean time to restore
         run: echo "The mean time to restore was ${STEPS_DORA_OUTPUTS_MTTR}"
         env:
