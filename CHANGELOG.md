@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.3](https://github.com/stenjo/devops-metrics-action/compare/v1.3.2...v1.3.3) (2026-04-30)
+
+
+### Bug Fixes
+
+* pull --rebase before pushing badge updates to avoid rejection ([86fef13](https://github.com/stenjo/devops-metrics-action/commit/86fef134029e90cccd4cb291c0cc54ad4f067a64))
+* quote shell interpolations in deploy-rate-log to prevent redirection ([8a87c37](https://github.com/stenjo/devops-metrics-action/commit/8a87c37269793744218f7e16e67677047ff34dc2))
+
 ## [1.3.2](https://github.com/stenjo/devops-metrics-action/compare/v1.3.1...v1.3.2) (2026-04-13)
 
 
