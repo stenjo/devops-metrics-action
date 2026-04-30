@@ -36,21 +36,28 @@ jobs:
 
       # Use the output from the `dora` step
       - name: Get the output rate
-        run: echo "The deploy rate was ${{ steps.dora.outputs.deploy-rate }}" # Use the output from the `dora` step
+        run: echo "The deploy rate was ${STEPS_DORA_OUTPUTS_DEPLOY_RATE}" # Use the output from the `dora` step
+        env:
+          STEPS_DORA_OUTPUTS_DEPLOY_RATE: ${{ steps.dora.outputs.deploy-rate }}
       - name: Get the lead time
-        run: echo "The lead time was ${{ steps.dora.outputs.lead-time }}" # Use the output from the `dora` step
+        run: echo "The lead time was ${STEPS_DORA_OUTPUTS_LEAD_TIME}" # Use the output from the `dora` step
+        env:
+          STEPS_DORA_OUTPUTS_LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
       - name: Get the change failure rate
-        run: echo "The change failure rate was ${{
-          steps.dora.outputs.change-failure-rate }}"
+        run: echo "The change failure rate was ${STEPS_DORA_OUTPUTS_CHANGE_FAILURE_RATE}"
+        env:
+          STEPS_DORA_OUTPUTS_CHANGE_FAILURE_RATE: ${{ steps.dora.outputs.change-failure-rate }}
       - name: Get the mean time to restore
-        run: echo "The mean time to restore was ${{ steps.dora.outputs.mttr }}"
+        run: echo "The mean time to restore was ${STEPS_DORA_OUTPUTS_MTTR}"
+        env:
+          STEPS_DORA_OUTPUTS_MTTR: ${{ steps.dora.outputs.mttr }}
 
       - name: Generate DORA badges
         run: |
           mkdir -p badges
 
           # Deploy Rate badge (higher is better: green >= 7, yellow >= 4, orange >= 1)
-          RATE="${{ steps.dora.outputs.deploy-rate }}"
+          RATE="${STEPS_DORA_OUTPUTS_DEPLOY_RATE}"
           if [ "$(echo "$RATE >= 7" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
           elif [ "$(echo "$RATE >= 4" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
           elif [ "$(echo "$RATE >= 1" | bc -l)" -eq 1 ]; then COLOR="yellow";
@@ -58,7 +65,7 @@ jobs:
           curl -s "https://img.shields.io/badge/Deploy%20Rate-${RATE}-${COLOR}" > badges/deploy-rate.svg
 
           # Lead Time badge (lower is better: green <= 3, yellow <= 5, orange <= 7)
-          LT="${{ steps.dora.outputs.lead-time }}"
+          LT="${STEPS_DORA_OUTPUTS_LEAD_TIME}"
           if [ "$(echo "$LT <= 3" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
           elif [ "$(echo "$LT <= 5" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
           elif [ "$(echo "$LT <= 7" | bc -l)" -eq 1 ]; then COLOR="yellow";
@@ -66,7 +73,7 @@ jobs:
           curl -s "https://img.shields.io/badge/Lead%20Time-${LT}-${COLOR}" > badges/lead-time.svg
 
           # Change Failure Rate badge (lower is better: green <= 1, yellow <= 8, orange <= 15)
-          CFR="${{ steps.dora.outputs.change-failure-rate }}"
+          CFR="${STEPS_DORA_OUTPUTS_CHANGE_FAILURE_RATE}"
           if [ "$(echo "$CFR <= 1" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
           elif [ "$(echo "$CFR <= 8" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
           elif [ "$(echo "$CFR <= 15" | bc -l)" -eq 1 ]; then COLOR="yellow";
@@ -74,12 +81,17 @@ jobs:
           curl -s "https://img.shields.io/badge/Change%20Failure%20Rate-${CFR}%25-${COLOR}" > badges/change-failure-rate.svg
 
           # Mean Time to Restore badge (lower is better: green <= 1, yellow <= 2, orange <= 3)
-          MTTR="${{ steps.dora.outputs.mttr }}"
+          MTTR="${STEPS_DORA_OUTPUTS_MTTR}"
           if [ "$(echo "$MTTR <= 1" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
           elif [ "$(echo "$MTTR <= 2" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
           elif [ "$(echo "$MTTR <= 3" | bc -l)" -eq 1 ]; then COLOR="yellow";
           else COLOR="red"; fi
           curl -s "https://img.shields.io/badge/Mean%20Time%20to%20Restore-${MTTR}-${COLOR}" > badges/mean-time-to-restore.svg
+        env:
+          STEPS_DORA_OUTPUTS_DEPLOY_RATE: ${{ steps.dora.outputs.deploy-rate }}
+          STEPS_DORA_OUTPUTS_LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
+          STEPS_DORA_OUTPUTS_CHANGE_FAILURE_RATE: ${{ steps.dora.outputs.change-failure-rate }}
+          STEPS_DORA_OUTPUTS_MTTR: ${{ steps.dora.outputs.mttr }}
 
       - name: Commit badges
         env:
