@@ -27,15 +27,17 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STEPS_RELEASE_OUTPUTS_MAJOR: ${{ steps.release.outputs.major }}
+          STEPS_RELEASE_OUTPUTS_MINOR: ${{ steps.release.outputs.minor }}
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git tag -d v${{ steps.release.outputs.major }} || true
-          git tag -d v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }} || true
-          git push origin :v${{ steps.release.outputs.major }} || true
-          git push origin :v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }} || true
-          git tag -a v${{ steps.release.outputs.major }} -m "Release v${{ steps.release.outputs.major }}"
-          git tag -a v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }} -m "Release v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}"
-          git push origin v${{ steps.release.outputs.major }}
-          git push origin v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}
+          git tag -d v${STEPS_RELEASE_OUTPUTS_MAJOR} || true
+          git tag -d v${STEPS_RELEASE_OUTPUTS_MAJOR}.${STEPS_RELEASE_OUTPUTS_MINOR} || true
+          git push origin :v${STEPS_RELEASE_OUTPUTS_MAJOR} || true
+          git push origin :v${STEPS_RELEASE_OUTPUTS_MAJOR}.${STEPS_RELEASE_OUTPUTS_MINOR} || true
+          git tag -a v${STEPS_RELEASE_OUTPUTS_MAJOR} -m "Release v${STEPS_RELEASE_OUTPUTS_MAJOR}"
+          git tag -a v${STEPS_RELEASE_OUTPUTS_MAJOR}.${STEPS_RELEASE_OUTPUTS_MINOR} -m "Release v${STEPS_RELEASE_OUTPUTS_MAJOR}.${STEPS_RELEASE_OUTPUTS_MINOR}"
+          git push origin v${STEPS_RELEASE_OUTPUTS_MAJOR}
+          git push origin v${STEPS_RELEASE_OUTPUTS_MAJOR}.${STEPS_RELEASE_OUTPUTS_MINOR}

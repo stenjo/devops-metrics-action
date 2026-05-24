@@ -79,7 +79,7 @@ jobs:
       - name: Create the Badge for Stryker Score
         if: github.ref == 'refs/heads/main'
         run: |
-          SCORE=${{ env.stryker-score }}
+          SCORE=${STRYKER_SCORE}
           if [ "$SCORE" -ge 90 ]; then COLOR="brightgreen";
           elif [ "$SCORE" -ge 80 ]; then COLOR="green";
           elif [ "$SCORE" -ge 70 ]; then COLOR="yellowgreen";
@@ -143,12 +143,12 @@ jobs:
           git checkout gh-pages
 
           # Create a directory for this PR and move the report there
-          mkdir -p reports/pr-${{env.PR_NUMBER}}
-          mv reports/mutation/mutation.html reports/pr-${{env.PR_NUMBER}}/mutation-report.html
+          mkdir -p reports/pr-${PR_NUMBER}
+          mv reports/mutation/mutation.html reports/pr-${PR_NUMBER}/mutation-report.html
 
           # Commit and push the changes
-          git add -f reports/pr-${{env.PR_NUMBER}}/mutation-report.html
-          git commit -m "Deploy mutation report for PR #${{env.PR_NUMBER}}"
+          git add -f reports/pr-${PR_NUMBER}/mutation-report.html
+          git commit -m "Deploy mutation report for PR #${PR_NUMBER}"
           git push origin gh-pages
 
       - name: Output the URL

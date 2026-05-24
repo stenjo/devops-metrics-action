@@ -52,18 +52,25 @@ jobs:
 
       - name: Check the output coverage
         run: |
-          echo "Coverage Percentage - ${{ steps.coverageComment.outputs.coverage }}"
-          echo "Coverage Color - ${{ steps.coverageComment.outputs.color }}"
-          echo "Summary HTML - ${{ steps.coverageComment.outputs.summaryHtml }}"
+          echo "Coverage Percentage - ${STEPS_COVERAGECOMMENT_OUTPUTS_COVERAGE}"
+          echo "Coverage Color - ${STEPS_COVERAGECOMMENT_OUTPUTS_COLOR}"
+          echo "Summary HTML - ${STEPS_COVERAGECOMMENT_OUTPUTS_SUMMARYHTML}"
           mv coverage/coverage-summary.json .
+        env:
+          STEPS_COVERAGECOMMENT_OUTPUTS_COVERAGE: ${{ steps.coverageComment.outputs.coverage }}
+          STEPS_COVERAGECOMMENT_OUTPUTS_COLOR: ${{ steps.coverageComment.outputs.color }}
+          STEPS_COVERAGECOMMENT_OUTPUTS_SUMMARYHTML: ${{ steps.coverageComment.outputs.summaryHtml }}
 
       - name: Create coverage badge
         if: steps.branch-name.outputs.current_branch == 'main'
         run: |
-          COVERAGE=${{ steps.coverageComment.outputs.coverage }}
-          COLOR=${{ steps.coverageComment.outputs.color }}
+          COVERAGE=${STEPS_COVERAGECOMMENT_OUTPUTS_COVERAGE}
+          COLOR=${STEPS_COVERAGECOMMENT_OUTPUTS_COLOR}
           mkdir -p badges
           curl -s "https://img.shields.io/badge/Test%20Coverage-${COVERAGE}%25-${COLOR}" > badges/coverage.svg
+        env:
+          STEPS_COVERAGECOMMENT_OUTPUTS_COVERAGE: ${{ steps.coverageComment.outputs.coverage }}
+          STEPS_COVERAGECOMMENT_OUTPUTS_COLOR: ${{ steps.coverageComment.outputs.color }}
 
       - name: Commit coverage badge and summary
         if: steps.branch-name.outputs.current_branch == 'main'
@@ -123,10 +130,14 @@ jobs:
       # Use the output from the `dora` step
       - name: Get the output rate
         run: |
-          printf "The deploy rate was %s" "${{ steps.dora.outputs.deploy-rate }}"
-          printf "The log was:\n%s" "${{ steps.dora.outputs.deploy-rate-log }}"
-          printf "%s" "${{ steps.dora.outputs.deploy-rate-log }}" > deploy-rate-log.txt
-          echo "The lead time was ${{ steps.dora.outputs.lead-time }}"
+          printf "The deploy rate was %s" "${STEPS_DORA_OUTPUTS_DEPLOY_RATE}"
+          printf "The log was:\n%s" "${STEPS_DORA_OUTPUTS_DEPLOY_RATE_LOG}"
+          printf "%s" "${STEPS_DORA_OUTPUTS_DEPLOY_RATE_LOG}" > deploy-rate-log.txt
+          echo "The lead time was ${STEPS_DORA_OUTPUTS_LEAD_TIME}"
+        env:
+          STEPS_DORA_OUTPUTS_DEPLOY_RATE: ${{ steps.dora.outputs.deploy-rate }}
+          STEPS_DORA_OUTPUTS_DEPLOY_RATE_LOG: ${{ steps.dora.outputs.deploy-rate-log }}
+          STEPS_DORA_OUTPUTS_LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
