@@ -61,8 +61,9 @@ vi.mock('@actions/core', () => ({
 }))
 
 describe('Release Adapter should', () => {
+  beforeAll(() => server.listen())
+
   beforeEach(() => {
-    server.listen()
     vi.clearAllMocks()
   })
 
