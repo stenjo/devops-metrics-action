@@ -24,8 +24,9 @@ vi.mock('@actions/core', () => ({
 }))
 
 describe('Issue Adapter should', () => {
+  beforeAll(() => server.listen())
+
   beforeEach(() => {
-    server.listen()
     vi.clearAllMocks()
   })
 
