@@ -34,7 +34,7 @@ jobs:
           python-version: '3.x'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run StrykerJS
         continue-on-error: true
