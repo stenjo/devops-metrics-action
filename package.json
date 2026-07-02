@@ -60,7 +60,7 @@
     "eslint-plugin-jsonc": "^3.2.0",
     "eslint-plugin-prettier": "^5.5.6",
     "globals": "^17.7.0",
-    "graphql": "^16.14.2",
+    "graphql": "^17.0.1",
     "make-coverage-badge": "^1.2.0",
     "msw": "^2.14.6",
     "prettier": "^3.8.4",
