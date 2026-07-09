@@ -122,6 +122,25 @@ output of the calculation step via variable format
   #  Use the output from the `dora` step
 ```
 
+> [!WARNING]
+> Do **not** interpolate the `*-log` outputs (e.g.
+> `${{ steps.dora.outputs.lead-time-log }}`) directly into a `run:` script.
+> These logs contain arbitrary pull-request and commit body text, which the
+> shell will try to evaluate. A body containing a `${...}` sequence causes
+> bash to fail with `bad substitution` and the step exits with code 1.
+> Pass log outputs through the environment instead so their content is treated
+> literally:
+>
+> ```yaml
+> - name: Get the lead time
+>   env:
+>     LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
+>     LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
+>   run: |
+>     echo "The lead time was $LEAD_TIME"
+>     printf '%s\n' "$LEAD_TIME_LOG" > lead-time-log.txt
+> ```
+
 More complex examples may be found in
 [.github/workflows/badges.yaml](https://github.com/stenjo/devops-metrics-action/blob/main/.github/workflows/badges.yaml)
 and
