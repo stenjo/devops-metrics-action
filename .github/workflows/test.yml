@@ -42,7 +42,7 @@ jobs:
 
       - name: Vitest Coverage Comment
         id: coverageComment
-        uses: MishaKav/jest-coverage-comment@40d7aed38d0fbaea266c34c12ab06356eec894eb # main
+        uses: MishaKav/jest-coverage-comment@25f2818fee93043532f640ad32a7565b4bd4ea9a # main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           summary-title: Vitest Coverage (summary)
