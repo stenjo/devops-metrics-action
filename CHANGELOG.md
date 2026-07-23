@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4](https://github.com/stenjo/devops-metrics-action/compare/v1.3.3...v1.3.4) (2026-07-23)
+
+
+### Bug Fixes
+
+* format empty mock objects for prettier compatibility ([cfb24a8](https://github.com/stenjo/devops-metrics-action/commit/cfb24a82ad8a1b0966256870b001e60bc6c0897e))
+
 ## [1.3.3](https://github.com/stenjo/devops-metrics-action/compare/v1.3.2...v1.3.3) (2026-06-25)
 
 
