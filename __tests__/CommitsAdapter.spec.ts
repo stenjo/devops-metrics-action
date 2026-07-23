@@ -38,11 +38,8 @@ describe('CommitsAdapter', () => {
 
   it('should fetch commits with the correct headers', async () => {
     const url = 'https://api.github.com/repos/owner/repo/commits'
-    const mockCommits: Commit[] = [
-      {
-        /* mock commit data */
-      }
-    ]
+    // mock commit data
+    const mockCommits: Commit[] = [{}]
     mockRequest.mockResolvedValue({data: mockCommits})
 
     const commits = await adapter.getCommitsFromUrl(url)
@@ -63,11 +60,8 @@ describe('CommitsAdapter', () => {
         throw new Error('Incorrect headers')
       }
       return {
-        data: [
-          {
-            /* mock commit data */
-          }
-        ]
+        // mock commit data
+        data: [{}]
       }
     })
 
