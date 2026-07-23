@@ -1,0 +1,50 @@
+name: Dependabot security -> fix release
+
+# Dependabot opens dependency PRs with a "build(deps)" commit type, which
+# release-please treats as release-neutral (no version bump). This workflow
+# detects Dependabot *security* updates (updates that resolve a vulnerability)
+# and rewrites the PR title to a "fix(deps): ..." Conventional Commit.
+#
+# When such a PR is squash-merged, the resulting commit is a "fix:", so
+# release-please opens/updates a *patch-level* release PR (release candidate).
+# Routine, non-security updates keep "build(deps)" and stay release-neutral.
+#
+# NOTE: this relies on squash-merging Dependabot PRs (the squash commit subject
+# defaults to the PR title). Keep "Squash and merge" enabled for the repo.
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  security-to-fix:
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      - name: Retitle security updates as fix
+        # Only when the update resolves a security advisory (GHSA id present)
+        # and the title is not already a "fix" commit (idempotent on re-runs).
+        if: ${{ steps.meta.outputs.ghsa-id != '' && !startsWith(github.event.pull_request.title, 'fix') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          GHSA_ID: ${{ steps.meta.outputs.ghsa-id }}
+        run: |
+          # Keep the summary after the first "<type>(<scope>): " prefix, if any.
+          summary="${PR_TITLE#*: }"
+          new_title="fix(deps): ${summary} [security ${GHSA_ID}]"
+          echo "Rewriting PR title to: ${new_title}"
+          gh pr edit "$PR_URL" --title "$new_title"
+          gh pr edit "$PR_URL" --add-label security || true
