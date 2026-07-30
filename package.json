@@ -49,7 +49,7 @@
     "@stryker-mutator/typescript-checker": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@types/node": "^26.1.1",
-    "@typescript-eslint/eslint-plugin": "^8.64.0",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.3.0",
     "@vercel/ncc": "^0.44.1",
     "@vitest/coverage-v8": "^4.1.10",
@@ -63,7 +63,7 @@
     "graphql": "^17.0.2",
     "make-coverage-badge": "^1.2.0",
     "msw": "^2.15.0",
-    "prettier": "^3.9.5",
+    "prettier": "^3.9.6",
     "typescript": "^6.0.3",
     "vitest": "^4.0.18"
   },
