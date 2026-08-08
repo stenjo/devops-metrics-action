@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Checking the dora metrics
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -27,7 +27,7 @@ jobs:
           cache: npm
 
       - name: DevOps Metrics from GitHub
-        uses: stenjo/devops-metrics-action@cfd27da70071cc8b7edafe6772eeac3a8d186dfd # v1.3.3
+        uses: stenjo/devops-metrics-action@df479783899932b26994e7f4208e5bca875a60c4 # v1.3.4
         id: dora
         with:
           owner: 'stenjo'
