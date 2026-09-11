@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.5](https://github.com/stenjo/devops-metrics-action/compare/v1.3.4...v1.3.5) (2026-09-11)
+
+
+### Bug Fixes
+
+* patch undici CVEs and rebuild dist ([657d183](https://github.com/stenjo/devops-metrics-action/commit/657d18347c354599b696049d6b05eed6770f3cb4))
+* patch undici CVEs to satisfy Trivy in Lint Codebase ([e155265](https://github.com/stenjo/devops-metrics-action/commit/e155265527d3b53ad34fc1c2a4bac206679e941b))
+* patch undici CVEs to satisfy Trivy in Lint Codebase ([5b8091b](https://github.com/stenjo/devops-metrics-action/commit/5b8091b31999e55d4a53549b08aad9c49b6642d5))
+
 ## [1.3.4](https://github.com/stenjo/devops-metrics-action/compare/v1.3.3...v1.3.4) (2026-07-23)
 
 
