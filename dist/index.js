@@ -36719,9 +36719,11 @@ class ChangeFailureRate {
     issues;
     releases;
     repos;
-    constructor(issues, releases, today = null) {
+    bugLabel;
+    constructor(issues, releases, today = null, bugLabel = 'bug') {
         this.today = today === null ? new Date() : today;
         this.issues = issues;
+        this.bugLabel = bugLabel;
         this.releases = releases
             .sort((a, b) => +new Date(a.published_at) < +new Date(b.published_at) ? -1 : 1)
             .filter(r => +new Date(r.published_at) >
@@ -36731,7 +36733,7 @@ class ChangeFailureRate {
     getBugs() {
         const bugs = [];
         for (const issue of this.issues) {
-            if (issue.labels.filter(label => label.name === 'bug').length > 0) {
+            if (issue.labels.filter(label => label.name === this.bugLabel).length > 0) {
                 bugs.push(issue);
             }
         }
@@ -36833,7 +36835,8 @@ class MeanTimeToRestore {
     issues;
     releases;
     releaseDates; // array of object with unix time and repo url
-    constructor(issues, releases, today = null) {
+    bugLabel;
+    constructor(issues, releases, today = null, bugLabel = 'bug') {
         if (today === null) {
             this.today = new Date();
         }
@@ -36842,6 +36845,7 @@ class MeanTimeToRestore {
         }
         this.issues = issues;
         this.releases = releases;
+        this.bugLabel = bugLabel;
         if (this.releases === null || this.releases.length === 0) {
             throw new Error('Empty release list');
         }
@@ -36878,7 +36882,7 @@ class MeanTimeToRestore {
         const bugs = [];
         for (const issue of this.issues) {
             const createdAt = +new Date(issue.created_at);
-            if (issue.labels.filter(label => label.name === 'bug').length > 0 &&
+            if (issue.labels.filter(label => label.name === this.bugLabel).length > 0 &&
                 createdAt > this.today.getTime() - 30 * MeanTimeToRestore_ONE_DAY) {
                 bugs.push(issue);
             }
@@ -37134,6 +37138,7 @@ async function run() {
         }
         const logging = getInput('logging');
         const filtered = getInput('filtered') === 'true' ? true : false;
+        const bugLabel = getInput('bug-label') || 'bug';
         const rel = new ReleaseAdapter(token, owner, repositories);
         const releaseList = (await rel.GetAllReleasesLastMonth());
         const df = new DeployFrequency(releaseList);
@@ -37153,9 +37158,9 @@ async function run() {
         const issueAdapter = new IssuesAdapter(token, owner, repositories);
         const issueList = await issueAdapter.GetAllIssuesLastMonth();
         if (issueList) {
-            const cfr = new ChangeFailureRate(issueList, releaseList);
+            const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel);
             setOutput('change-failure-rate', cfr.Cfr());
-            const mttr = new MeanTimeToRestore(issueList, releaseList);
+            const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel);
             setOutput('mttr', mttr.mttr());
         }
         else {

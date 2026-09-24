@@ -375,4 +375,78 @@ describe('MeanTimeToRestore should', () => {
 
     expect(meanTime).toBe(0)
   })
+
+  describe('with a custom bug label', () => {
+    const localReleases = [
+      {
+        published_at: '2023-04-30T00:00:00Z',
+        url: 'path/with/repository/in/it'
+      },
+      {
+        published_at: '2023-04-24T00:00:00Z',
+        url: 'path/with/repository/in/it'
+      },
+      {
+        published_at: '2023-04-20T00:00:00Z',
+        url: 'path/with/repository/in/it'
+      }
+    ] as Release[]
+    const today = new Date('2023-04-30T00:00:00Z')
+
+    const issuesLabelled = (label: string): Issue[] =>
+      [
+        {
+          created_at: '2023-04-22T21:44:06Z',
+          closed_at: '2023-04-23T16:47:40Z',
+          labels: [{name: label}],
+          repository_url: 'some-path/repository'
+        },
+        {
+          created_at: '2023-04-25T21:21:49Z',
+          closed_at: '2023-04-29T12:54:45Z',
+          labels: [{name: label}],
+          repository_url: 'some-path/repository'
+        }
+      ] as Issue[]
+
+    it('count issues tagged with the custom label', () => {
+      const mttrCustom = new MeanTimeToRestore(
+        issuesLabelled('incident'),
+        localReleases,
+        today,
+        'incident'
+      )
+
+      expect(mttrCustom.getBugCount().length).toBe(2)
+      expect(mttrCustom.mttr()).toBe(5)
+    })
+
+    it('ignore issues tagged bug when a custom label is given', () => {
+      const mttrCustom = new MeanTimeToRestore(
+        issuesLabelled('bug'),
+        localReleases,
+        today,
+        'incident'
+      )
+
+      expect(mttrCustom.getBugCount().length).toBe(0)
+      expect(mttrCustom.mttr()).toBe(0)
+    })
+
+    it('default to the bug label when none is given', () => {
+      const mttrDefault = new MeanTimeToRestore(
+        issuesLabelled('bug'),
+        localReleases,
+        today
+      )
+      const mttrIncident = new MeanTimeToRestore(
+        issuesLabelled('incident'),
+        localReleases,
+        today
+      )
+
+      expect(mttrDefault.getBugCount().length).toBe(2)
+      expect(mttrIncident.getBugCount().length).toBe(0)
+    })
+  })
 })
