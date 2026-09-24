@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/stenjo/devops-metrics-action/compare/v1.3.5...v1.4.0) (2026-09-24)
+
+
+### Features
+
+* **mttr:** specify tag name that otherwise defaults to bug ([f020c5f](https://github.com/stenjo/devops-metrics-action/commit/f020c5f178de5be9b7bbd9f15fc9bd2188ed4b39)), closes [#434](https://github.com/stenjo/devops-metrics-action/issues/434)
+
 ## [1.3.5](https://github.com/stenjo/devops-metrics-action/compare/v1.3.4...v1.3.5) (2026-09-11)
 
 
