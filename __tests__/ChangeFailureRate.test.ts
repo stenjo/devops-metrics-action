@@ -464,4 +464,63 @@ describe('ChangeFailureRate should', () => {
 
     expect(value).toBe(50)
   })
+
+  describe('with a custom bug label', () => {
+    const releases = [
+      {
+        url: 'https://api.github.com/repos/stenjo/dora/releases/101411508',
+        published_at: '2023-04-30T16:50:53Z'
+      }
+    ] as Release[]
+    const today = new Date('2023-04-30T17:50:53Z')
+
+    const issuesLabelled = (label: string): Issue[] =>
+      [
+        {
+          created_at: '2023-04-30T17:50:53Z',
+          labels: [{name: label}],
+          repository_url: 'https://api.github.com/repos/stenjo/dora'
+        }
+      ] as Issue[]
+
+    it('count issues tagged with the custom label', () => {
+      const cfr = new ChangeFailureRate(
+        issuesLabelled('incident'),
+        releases,
+        today,
+        'incident'
+      )
+
+      expect(cfr.getBugs().length).toBe(1)
+      expect(cfr.Cfr()).toBe(100)
+    })
+
+    it('ignore issues tagged bug when a custom label is given', () => {
+      const cfr = new ChangeFailureRate(
+        issuesLabelled('bug'),
+        releases,
+        today,
+        'incident'
+      )
+
+      expect(cfr.getBugs().length).toBe(0)
+      expect(cfr.Cfr()).toBe(0)
+    })
+
+    it('default to the bug label when none is given', () => {
+      const cfrDefault = new ChangeFailureRate(
+        issuesLabelled('bug'),
+        releases,
+        today
+      )
+      const cfrIncident = new ChangeFailureRate(
+        issuesLabelled('incident'),
+        releases,
+        today
+      )
+
+      expect(cfrDefault.getBugs().length).toBe(1)
+      expect(cfrIncident.getBugs().length).toBe(0)
+    })
+  })
 })

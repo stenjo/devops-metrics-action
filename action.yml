@@ -20,6 +20,11 @@ inputs:
   filtered:
     description: 'Filtering only feat and fix as basis for lead time'
     required: false
+  bug-label:
+    description: 'Issue label that identifies a bug/incident for mttr and
+      change-failure-rate'
+    required: false
+    default: 'bug'
 outputs:
   deploy-rate: # pull requests merged to main per week
     description: 'Deployment rate (deploys/week)'
@@ -27,10 +32,10 @@ outputs:
   lead-time: # Average time between first commit on a feature and its deployment into production
     description: 'Feature lead-time (days)'
 
-  change-failure-rate: # Percentage of releases causing an Issue tagged with "bug"
+  change-failure-rate: # Percentage of releases causing an Issue tagged with bug-label
     description: 'Change failure rate (%)'
 
-  mttr: # Average time between releases where "bug" is created and closed
+  mttr: # Average time between releases where an issue tagged with bug-label is created and closed
     description: 'Mean time to restore (days)'
 
   deploy-rate-log: # list of releases that forms the basis of the deployment rate

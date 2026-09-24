@@ -54,6 +54,16 @@ Set to true to make event logs of metrics source available.
 Set to true to filter pulls to only include feat and fix as basis for the lead
 time metric
 
+### `bug-label`
+
+Name of the issue label that identifies a bug or incident. Issues carrying this
+label form the basis for the `change-failure-rate` and `mttr` metrics. Default
+is `bug`.
+
+```yaml
+bug-label: incident
+```
+
 ## Outputs
 
 ### `deploy-frequency`
@@ -75,17 +85,18 @@ forming the basis for the metric, if `logging` is enabled.
 ### `change-failure-rate`
 
 Number of registered issues tagged as bugs divided by number of release tags
-last month. By counting the bugs (GitHub issues tagged as `bug`) between
-releases the last month and average this, we get the failures over releases
-rate. Number in range 0 - 100 (%)
+last month. By counting the bugs (GitHub issues tagged with the `bug-label`
+label, default `bug`) between releases the last month and average this, we get
+the failures over releases rate. Number in range 0 - 100 (%)
 
 ### `mttr`
 
 Mean time to restore. This metric is calculated based on the time between the
-last release before an issue tagged as a bug and the first release after the bug
-is closed. For this to work correctly we must assume GitHub issues are created
-for all unwanted issues in production and that all changes to production is done
-through releases. Number in hours (integer)
+last release before an issue tagged with the `bug-label` label (default `bug`)
+and the first release after the issue is closed. For this to work correctly we
+must assume GitHub issues are created for all unwanted issues in production and
+that all changes to production is done through releases. Number in hours
+(integer)
 
 ## Usage
 

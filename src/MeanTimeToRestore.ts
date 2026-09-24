@@ -19,8 +19,14 @@ export class MeanTimeToRestore {
   issues: Issue[]
   releases: Release[]
   releaseDates: ReleaseDate[] // array of object with unix time and repo url
+  bugLabel: string
 
-  constructor(issues: Issue[], releases: Release[], today: Date | null = null) {
+  constructor(
+    issues: Issue[],
+    releases: Release[],
+    today: Date | null = null,
+    bugLabel = 'bug'
+  ) {
     if (today === null) {
       this.today = new Date()
     } else {
@@ -28,6 +34,7 @@ export class MeanTimeToRestore {
     }
     this.issues = issues
     this.releases = releases
+    this.bugLabel = bugLabel
     if (this.releases === null || this.releases.length === 0) {
       throw new Error('Empty release list')
     }
@@ -71,7 +78,7 @@ export class MeanTimeToRestore {
     for (const issue of this.issues) {
       const createdAt = +new Date(issue.created_at)
       if (
-        issue.labels.filter(label => label.name === 'bug').length > 0 &&
+        issue.labels.filter(label => label.name === this.bugLabel).length > 0 &&
         createdAt > this.today.getTime() - 30 * ONE_DAY
       ) {
         bugs.push(issue)
