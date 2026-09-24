@@ -6,10 +6,17 @@ export class ChangeFailureRate {
   issues: Issue[]
   releases: Release[]
   repos: string[]
+  bugLabel: string
 
-  constructor(issues: Issue[], releases: Release[], today: Date | null = null) {
+  constructor(
+    issues: Issue[],
+    releases: Release[],
+    today: Date | null = null,
+    bugLabel = 'bug'
+  ) {
     this.today = today === null ? new Date() : today
     this.issues = issues
+    this.bugLabel = bugLabel
     this.releases = releases
       .sort((a, b) =>
         +new Date(a.published_at) < +new Date(b.published_at) ? -1 : 1
@@ -25,7 +32,9 @@ export class ChangeFailureRate {
   getBugs(): Issue[] {
     const bugs: Issue[] = []
     for (const issue of this.issues) {
-      if (issue.labels.filter(label => label.name === 'bug').length > 0) {
+      if (
+        issue.labels.filter(label => label.name === this.bugLabel).length > 0
+      ) {
         bugs.push(issue)
       }
     }

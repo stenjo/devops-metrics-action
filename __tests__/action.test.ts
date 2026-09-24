@@ -279,4 +279,64 @@ describe('run', () => {
     expect(core.getInput).toHaveBeenCalledWith('filtered')
     // You would test the value of filtered indirectly via your logic (mocking, checking calls, etc.)
   })
+
+  it("should pass the 'bug-label' input to ChangeFailureRate and MeanTimeToRestore", async () => {
+    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
+      if (name === 'bug-label') {
+        return 'incident'
+      }
+      return ''
+    })
+    const mockIssues = [{}] as Issue[]
+    const mockReleases = [{}] as Release[]
+    ;(
+      ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
+    ).mockResolvedValue(mockReleases)
+    ;(IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock).mockResolvedValue(
+      mockIssues
+    )
+
+    await run()
+
+    expect(core.getInput).toHaveBeenCalledWith('bug-label')
+    expect(ChangeFailureRate).toHaveBeenCalledWith(
+      mockIssues,
+      mockReleases,
+      null,
+      'incident'
+    )
+    expect(MeanTimeToRestore).toHaveBeenCalledWith(
+      mockIssues,
+      mockReleases,
+      null,
+      'incident'
+    )
+  })
+
+  it("should default 'bug-label' to 'bug' when the input is empty", async () => {
+    vi.spyOn(core, 'getInput').mockReturnValue('')
+    const mockIssues = [{}] as Issue[]
+    const mockReleases = [{}] as Release[]
+    ;(
+      ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
+    ).mockResolvedValue(mockReleases)
+    ;(IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock).mockResolvedValue(
+      mockIssues
+    )
+
+    await run()
+
+    expect(ChangeFailureRate).toHaveBeenCalledWith(
+      mockIssues,
+      mockReleases,
+      null,
+      'bug'
+    )
+    expect(MeanTimeToRestore).toHaveBeenCalledWith(
+      mockIssues,
+      mockReleases,
+      null,
+      'bug'
+    )
+  })
 })

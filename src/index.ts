@@ -55,6 +55,7 @@ export async function run(): Promise<void> {
     const logging: string | undefined = core.getInput('logging')
     const filtered: boolean | undefined =
       core.getInput('filtered') === 'true' ? true : false
+    const bugLabel: string = core.getInput('bug-label') || 'bug'
 
     const rel = new ReleaseAdapter(token, owner, repositories)
     const releaseList = (await rel.GetAllReleasesLastMonth()) as Release[]
@@ -78,9 +79,9 @@ export async function run(): Promise<void> {
     const issueList: Issue[] | undefined =
       await issueAdapter.GetAllIssuesLastMonth()
     if (issueList) {
-      const cfr = new ChangeFailureRate(issueList, releaseList)
+      const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel)
       core.setOutput('change-failure-rate', cfr.Cfr())
-      const mttr = new MeanTimeToRestore(issueList, releaseList)
+      const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel)
       core.setOutput('mttr', mttr.mttr())
     } else {
       core.setOutput('change-failure-rate', 'empty issue list')
