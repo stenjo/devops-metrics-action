@@ -26,7 +26,7 @@ jobs:
 
       - name: Setup Node.js
         id: setup-node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: .node-version
           package-manager-cache: false
@@ -42,7 +42,7 @@ jobs:
 
       - name: Vitest Coverage Comment
         id: coverageComment
-        uses: MishaKav/jest-coverage-comment@642ef024cc554a34b7082cea12c7bf63575ae151 # main
+        uses: MishaKav/jest-coverage-comment@1b5d15445c8afba0c13bd00167bd31130b812d0a # main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           summary-title: Vitest Coverage (summary)
@@ -128,7 +128,7 @@ jobs:
           printf "%s" "${{ steps.dora.outputs.deploy-rate-log }}" > deploy-rate-log.txt
           echo "The lead time was ${{ steps.dora.outputs.lead-time }}"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: logs
           path: ./*-log.txt
