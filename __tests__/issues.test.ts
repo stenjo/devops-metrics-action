@@ -1,14 +1,17 @@
 import fs from 'node:fs'
 import {IssuesAdapter} from '../src/IssuesAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import type {Issue} from '../src/types/Issue'
 import * as dotenv from 'dotenv'
 
 dotenv.config()
 
 describe.skipIf(!process.env.GH_TOKEN)('Real Issues API should', () => {
-  const issueAdapter = new IssuesAdapter(process.env.GH_TOKEN, 'stenjo', [
-    'dora'
-  ])
+  const issueAdapter = new IssuesAdapter(
+    new GitHubClient({token: process.env.GH_TOKEN}),
+    'stenjo',
+    ['dora']
+  )
 
   test('fetch issues', async () => {
     const il = await issueAdapter.GetAllIssuesLastMonth()
@@ -18,7 +21,7 @@ describe.skipIf(!process.env.GH_TOKEN)('Real Issues API should', () => {
 
 describe('mocked Issues API should', () => {
   test('return issues', async () => {
-    const issueAdapter = new IssuesAdapter(process.env.GH_TOKEN, 'stenjo', [
+    const issueAdapter = new IssuesAdapter(new GitHubClient(), 'stenjo', [
       'dora'
     ])
     mockedGetIssuesReturns('./__tests__/test-data/issue-list.json')
@@ -29,11 +32,8 @@ describe('mocked Issues API should', () => {
 })
 
 function mockedGetIssuesReturns(file: string): void {
-  // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-  const getIssuesMock = vi.spyOn(IssuesAdapter.prototype as any, 'getIssues')
-  getIssuesMock.mockImplementation(async (): Promise<Issue[]> => {
-    return Promise.resolve(
+  vi.spyOn(GitHubClient.prototype, 'paginate').mockImplementation(
+    async (): Promise<Issue[]> =>
       JSON.parse(fs.readFileSync(file).toString()) as Issue[]
-    )
-  })
+  )
 }

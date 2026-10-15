@@ -10,6 +10,7 @@ import {MeanTimeToRestore} from './MeanTimeToRestore'
 import {PullRequestsAdapter} from './PullRequestsAdapter'
 import {CommitsAdapter} from './CommitsAdapter'
 import {LeadTime} from './LeadTime'
+import {GitHubClient} from './GitHubClient'
 import type {Release} from './types/Release'
 import type {PullRequest} from './types/PullRequest'
 
@@ -57,7 +58,8 @@ export async function run(): Promise<void> {
       core.getInput('filtered') === 'true' ? true : false
     const bugLabel: string = core.getInput('bug-label') || 'bug'
 
-    const rel = new ReleaseAdapter(token, owner, repositories)
+    const client = new GitHubClient({token})
+    const rel = new ReleaseAdapter(client, owner, repositories)
     const releaseList = (await rel.GetAllReleasesLastMonth()) as Release[]
     const df = new DeployFrequency(releaseList)
     core.setOutput('deploy-rate', df.rate())
@@ -65,8 +67,8 @@ export async function run(): Promise<void> {
       core.setOutput('deploy-rate-log', df.getLog().join('\n'))
     }
 
-    const prs = new PullRequestsAdapter(token, owner, repositories)
-    const commits = new CommitsAdapter(token)
+    const prs = new PullRequestsAdapter(client, owner, repositories)
+    const commits = new CommitsAdapter(client)
     const pulls = (await prs.GetAllPRsLastMonth()) as PullRequest[]
     const lt = new LeadTime(pulls, releaseList, commits)
     const leadTime = await lt.getLeadTime(filtered)
@@ -75,7 +77,7 @@ export async function run(): Promise<void> {
       core.setOutput('lead-time-log', lt.getLog().join('\n'))
     }
 
-    const issueAdapter = new IssuesAdapter(token, owner, repositories)
+    const issueAdapter = new IssuesAdapter(client, owner, repositories)
     const issueList: Issue[] | undefined =
       await issueAdapter.GetAllIssuesLastMonth()
     if (issueList) {

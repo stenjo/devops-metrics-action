@@ -1,39 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {Octokit} from '@octokit/core'
 import * as core from '@actions/core'
-import {Commit} from './types/Commit'
-import {ICommitsAdapter} from './interfaces/ICommitsAdapter'
+import type {Commit} from './types/Commit'
+import type {ICommitsAdapter} from './interfaces/ICommitsAdapter'
+import type {GitHubClient} from './GitHubClient'
 
 export class CommitsAdapter implements ICommitsAdapter {
-  token: string | undefined
-  octokit: Octokit
+  client: GitHubClient
 
-  constructor(token: string | undefined) {
-    this.token = token
-    this.octokit = new Octokit({
-      auth: this.token
-    })
+  constructor(client: GitHubClient) {
+    this.client = client
   }
+
   async getCommitsFromUrl(url: string): Promise<Commit[] | undefined> {
     try {
-      const result = await this.getCommits(this.octokit, url)
-
-      return result
+      return await this.client.request<Commit[]>(url)
     } catch (e: any) {
       core.setFailed(e.message)
     }
-  }
-
-  private async getCommits(
-    octokit: Octokit,
-    url: string
-  ): Promise<Commit[] | undefined> {
-    const result = await octokit.request(url, {
-      headers: {
-        'X-GitHub-Api-Version': '2022-11-28'
-      }
-    })
-
-    return Promise.resolve(result.data)
   }
 }

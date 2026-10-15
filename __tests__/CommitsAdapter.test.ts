@@ -2,6 +2,7 @@ import {http, HttpResponse} from 'msw'
 import {setupServer} from 'msw/node'
 import {setFailed} from '@actions/core'
 import {CommitsAdapter} from '../src/CommitsAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import fs from 'fs'
 import {Commit} from '../src/types/Commit'
 
@@ -37,7 +38,7 @@ describe('Commit Adapter should', () => {
   })
 
   it('return unpaged values', async () => {
-    const r = new CommitsAdapter(undefined)
+    const r = new CommitsAdapter(new GitHubClient())
 
     const releases: Commit[] = (await r.getCommitsFromUrl(
       commitsUrl
@@ -58,7 +59,7 @@ describe('Commit Adapter should', () => {
       )
     )
     errorServer.listen()
-    const r = new CommitsAdapter(commitsUrl)
+    const r = new CommitsAdapter(new GitHubClient())
     const result = await r.getCommitsFromUrl(commitsUrl)
     expect(result).toBe(undefined)
     expect(setFailed).toHaveBeenCalledWith('Bad credentials')

@@ -1,10 +1,11 @@
 import {ReleaseAdapter} from '../src/ReleaseAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import type {Release} from '../src/types/Release'
 import fs from 'node:fs'
 
 describe('Mocked Release API should', () => {
   it('return releases', async () => {
-    const r = new ReleaseAdapter(undefined, 'testowner', ['project1'])
+    const r = new ReleaseAdapter(new GitHubClient(), 'testowner', ['project1'])
     mockedGetReleasesReturns('./__tests__/test-data/releases.json')
 
     const releases: Release[] = (await r.GetAllReleasesLastMonth()) as Release[]
@@ -16,15 +17,8 @@ describe('Mocked Release API should', () => {
 })
 
 function mockedGetReleasesReturns(file: string): void {
-  const getIssuesMock = vi.spyOn(
-    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-    // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-    ReleaseAdapter.prototype as any,
-    'getReleases'
-  )
-  getIssuesMock.mockImplementation(async (): Promise<Release[]> => {
-    return Promise.resolve(
+  vi.spyOn(GitHubClient.prototype, 'paginate').mockImplementation(
+    async (): Promise<Release[]> =>
       JSON.parse(fs.readFileSync(file).toString()) as Release[]
-    )
-  })
+  )
 }

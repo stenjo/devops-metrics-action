@@ -1,0 +1,106 @@
+[
+  {
+    "date": "2026-10-15",
+    "commit": "a6ca971",
+    "branch": "450-teststryker-raise-mutation-score-to-above-90",
+    "scope": "Production code (src/, action.yml, package.json) and production-relevant workflows. Tests, CI helpers and local tooling excluded.",
+    "method": "Manual code review against 8 fixed categories, whole-number 0-10 per category, overall = sum/80*100.",
+    "tracking_issues": [452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464],
+    "category_scores": {
+      "authorization_access_control": 6,
+      "authentication_token_validation": 5,
+      "input_validation_boundary_hardening": 4,
+      "injection_safety_query_construction": 6,
+      "data_integrity_atomicity_auditability": 7,
+      "information_disclosure_error_handling": 6,
+      "abuse_prevention_rate_limiting_operational_safety": 4,
+      "secrets_secure_configuration": 7
+    },
+    "overall_score": 56,
+    "critical_issues": [
+      {
+        "title": "Untrusted PR titles and commit messages are emitted verbatim in step outputs (lead-time-log, deploy-rate-log)",
+        "severity": "medium",
+        "category": "information_disclosure_error_handling / injection_safety_query_construction",
+        "evidence": [
+          "src/LeadTime.ts: log.push(`pull-> ${pull.merged_at} : ${pull.title}`) and `${firstCommit.commit.message}`",
+          "src/DeployFrequency.ts: log.push(`release-> ${release.name}:${release.published_at}`)",
+          "src/index.ts: core.setOutput('lead-time-log', lt.getLog().join('\\n')) when logging === 'true'",
+          "README.md WARNING: consumers must not interpolate *-log outputs into run: scripts"
+        ],
+        "impact": "Any contributor to a monitored repo controls text that lands in a GitHub Actions output; consumers that interpolate it into run: get shell/expression injection in their job context.",
+        "why_it_matters": "Only mitigation is a README warning; no sanitization or bounding in code.",
+        "tracked_by": [455, 453]
+      },
+      {
+        "title": "Silent fallback to unauthenticated GitHub API when no token is supplied",
+        "severity": "medium",
+        "category": "authentication_token_validation",
+        "evidence": [
+          "src/index.ts: token = core.getInput('token') || process.env.GH_TOKEN with no definedness check",
+          "all adapters: new Octokit({ auth: this.token }) with token: string | undefined",
+          "action.yml: token input required: false, no default"
+        ],
+        "impact": "Anonymous requests: private repos return 404 -> metrics silently become 0; public repos hit 60 req/h limit.",
+        "why_it_matters": "Misconfiguration produces plausible but wrong output instead of failing closed.",
+        "tracked_by": [456]
+      },
+      {
+        "title": "Token from GH_TOKEN env fallback is never registered with core.setSecret",
+        "severity": "low",
+        "category": "secrets_secure_configuration",
+        "evidence": ["src/index.ts reads process.env.GH_TOKEN; no setSecret usage anywhere in src/"],
+        "impact": "Token not masked in logs if sourced outside the secrets.* context.",
+        "why_it_matters": "setSecret is the standard zero-cost defence.",
+        "tracked_by": [456]
+      },
+      {
+        "title": "API-supplied commits_url is fetched with the bearer token and no host allowlist",
+        "severity": "low",
+        "category": "injection_safety_query_construction",
+        "evidence": [
+          "src/LeadTime.ts: commitsAdapter.getCommitsFromUrl(pull.commits_url)",
+          "src/CommitsAdapter.ts: octokit.request(url, ...) with a full URL from the PR payload"
+        ],
+        "impact": "Code trusts response data to decide where an authenticated request is sent; practical exploitability very low.",
+        "why_it_matters": "Defence in depth at zero functional cost.",
+        "tracked_by": [457]
+      },
+      {
+        "title": "No throttling, retry, or workload bounds on GitHub API usage",
+        "severity": "low",
+        "category": "abuse_prevention_rate_limiting_operational_safety",
+        "evidence": [
+          "src/index.ts: repositories list has no maximum",
+          "adapters: up to 99 pages x 100 items per resource per repo",
+          "src/LeadTime.ts: one commits request per qualifying PR, sequential, uncapped",
+          "package.json: only @octokit/core; no throttling/retry plugins"
+        ],
+        "impact": "Can exhaust GITHUB_TOKEN rate limit -> partial data and starved later steps.",
+        "why_it_matters": "Read-only action, so availability/accuracy impact, but bounds are absent.",
+        "tracked_by": [458, 459]
+      },
+      {
+        "title": "Inputs owner, repo and bug-label are not validated beyond non-empty",
+        "severity": "low",
+        "category": "input_validation_boundary_hardening",
+        "evidence": [
+          "src/index.ts: repo.split(/[[\\]\\n,]+/).map(trim).filter(non-empty) with no pattern check",
+          "owner and bugLabel passed straight through"
+        ],
+        "impact": "Octokit URL-encodes route params so traversal is not achievable; residual effect is opaque API errors.",
+        "why_it_matters": "No boundary validation layer; protection is incidental to a dependency.",
+        "tracked_by": [462]
+      }
+    ],
+    "recommendations": [
+      { "priority": "high", "category": "injection_safety_query_construction", "action": "Sanitize and bound *-log output content; emit as JSON array.", "reason": "Moves protection from docs into code.", "tracked_by": [455] },
+      { "priority": "high", "category": "authentication_token_validation", "action": "Fail fast without a token; call core.setSecret; default token to github.token in action.yml.", "reason": "Eliminates silent anonymous mode; ensures masking.", "tracked_by": [456] },
+      { "priority": "medium", "category": "abuse_prevention_rate_limiting_operational_safety", "action": "Add @octokit/plugin-throttling + plugin-retry; bound repos and commit fetches; stop paginating outside the window.", "reason": "Prevents rate-limit exhaustion and partial results.", "tracked_by": [458, 459] },
+      { "priority": "medium", "category": "injection_safety_query_construction", "action": "Assert api.github.com host or rebuild the commits route from owner/repo/number.", "reason": "Avoids forwarding the bearer token to a response-chosen URL.", "tracked_by": [457] },
+      { "priority": "low", "category": "input_validation_boundary_hardening", "action": "Validate owner/repo against ^[A-Za-z0-9_.-]+$; trim/bound bug-label.", "reason": "Explicit boundary with clear errors.", "tracked_by": [462] },
+      { "priority": "low", "category": "information_disclosure_error_handling", "action": "Wrap adapter errors with a fixed message + status instead of forwarding e.message.", "reason": "Predictable, minimal logs.", "tracked_by": [454] },
+      { "priority": "low", "category": "secrets_secure_configuration", "action": "Keep SHA-pinned actions, persist-credentials:false, check-dist, Dependabot, CodeQL, dependency overrides; add permissions: contents: read to README example.", "reason": "Supply chain already strong; nudge consumers to least privilege.", "tracked_by": [464] }
+    ]
+  }
+]

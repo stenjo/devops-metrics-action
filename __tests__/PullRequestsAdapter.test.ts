@@ -2,6 +2,7 @@ import {http, HttpResponse} from 'msw'
 import {setupServer} from 'msw/node'
 import {setFailed} from '@actions/core'
 import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import type {PullRequest} from '../src/types/PullRequest'
 
 const server = setupServer(
@@ -39,7 +40,9 @@ describe('PullRequest Adapter should', () => {
   })
 
   it('return paged values', async () => {
-    const r = new PullRequestsAdapter(undefined, 'test-owner', ['project1'])
+    const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
+      'project1'
+    ])
 
     const pullRequests: PullRequest[] =
       (await r.GetAllPRsLastMonth()) as PullRequest[]
@@ -58,7 +61,11 @@ describe('PullRequest Adapter should', () => {
         }
       )
     )
-    const r = new PullRequestsAdapter('my-token', 'test-owner', ['project1'])
+    const r = new PullRequestsAdapter(
+      new GitHubClient({token: 'my-token'}),
+      'test-owner',
+      ['project1']
+    )
     r.today = new Date('2024-03-01T12:00:00Z')
 
     await r.GetAllPRsLastMonth()
@@ -87,7 +94,9 @@ describe('PullRequest Adapter should', () => {
         }
       )
     )
-    const r = new PullRequestsAdapter(undefined, 'test-owner', ['project1'])
+    const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
+      'project1'
+    ])
 
     const pullRequests = (await r.GetAllPRsLastMonth()) as PullRequest[]
 
@@ -110,7 +119,9 @@ describe('PullRequest Adapter should', () => {
       )
     )
     errorServer.listen()
-    const r = new PullRequestsAdapter(undefined, 'test-owner', ['project1'])
+    const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
+      'project1'
+    ])
     const result = await r.GetAllPRsLastMonth()
     expect(result).toBe(undefined)
     expect(setFailed).toHaveBeenCalledWith('access denied')
