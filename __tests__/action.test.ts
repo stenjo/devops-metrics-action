@@ -6,6 +6,7 @@ import {ChangeFailureRate} from '../src/ChangeFailureRate'
 import {IssuesAdapter} from '../src/IssuesAdapter'
 import {MeanTimeToRestore} from '../src/MeanTimeToRestore'
 import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
+import {CommitsAdapter} from '../src/CommitsAdapter'
 import {LeadTime} from '../src/LeadTime'
 import {run} from '../src/index'
 import type {Release} from '../src/types/Release'
@@ -29,83 +30,64 @@ Object.defineProperty(github.context, 'repo', {
   get: () => mockRepo
 })
 
+function mockInputs(inputs: Record<string, string | null>): void {
+  vi.spyOn(core, 'getInput').mockImplementation(
+    (name: string) => (name in inputs ? inputs[name] : '') as string
+  )
+}
+
 describe('run', () => {
+  const originalToken = process.env.GH_TOKEN
+
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    if (originalToken === undefined) {
+      delete process.env.GH_TOKEN
+    } else {
+      process.env.GH_TOKEN = originalToken
+    }
+  })
+
   it('should use the provided token input', async () => {
-    const mockToken = 'provided-token'
-
-    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      if (name === 'token') {
-        return mockToken
-      }
-      return ''
-    })
-
-    const token = process.env.GH_TOKEN
-    process.env.GH_TOKEN = undefined // Temporarily remove GH_TOKEN for this test = undefined // Temporarily remove GH_TOKEN for this test
+    mockInputs({token: 'provided-token', repo: 'repo1', owner: 'o'})
+    process.env.GH_TOKEN = 'env-token'
 
     await run()
 
-    expect(core.getInput).toHaveBeenCalledWith('token')
-    expect(process.env.GH_TOKEN).toBe('undefined') // Ensure the environment variable is not used
-    process.env.GH_TOKEN = token // Restore GH_TOKEN for other tests
+    expect(ReleaseAdapter).toHaveBeenCalledWith('provided-token', 'o', [
+      'repo1'
+    ])
+    expect(PullRequestsAdapter).toHaveBeenCalledWith('provided-token', 'o', [
+      'repo1'
+    ])
+    expect(CommitsAdapter).toHaveBeenCalledWith('provided-token')
+    expect(IssuesAdapter).toHaveBeenCalledWith('provided-token', 'o', ['repo1'])
   })
 
   it('should fall back to GH_TOKEN environment variable if token input is empty', async () => {
-    const mockEnvToken = 'env-token'
-
-    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      if (name === 'token') {
-        return ''
-      }
-      return ''
-    })
-
-    process.env.GH_TOKEN = mockEnvToken
+    mockInputs({token: '', repo: 'repo1', owner: 'o'})
+    process.env.GH_TOKEN = 'env-token'
 
     await run()
 
-    expect(core.getInput).toHaveBeenCalledWith('token')
-    expect(process.env.GH_TOKEN).toBe(mockEnvToken)
+    expect(ReleaseAdapter).toHaveBeenCalledWith('env-token', 'o', ['repo1'])
+    expect(CommitsAdapter).toHaveBeenCalledWith('env-token')
   })
 
   it('should handle a null token input and fall back to GH_TOKEN environment variable', async () => {
-    const mockEnvToken = 'env-token'
-
-    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      if (name === 'token') {
-        return null as unknown as string // Simulate null input
-      }
-      return ''
-    })
-
-    process.env.GH_TOKEN = mockEnvToken
+    mockInputs({token: null, repo: 'repo1', owner: 'o'})
+    process.env.GH_TOKEN = 'env-token'
 
     await run()
 
-    expect(core.getInput).toHaveBeenCalledWith('token')
-    expect(process.env.GH_TOKEN).toBe(mockEnvToken)
+    expect(ReleaseAdapter).toHaveBeenCalledWith('env-token', 'o', ['repo1'])
   })
+
   it('should use default repo and owner when inputs are not provided', async () => {
-    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      switch (name) {
-        case 'repo':
-          return ''
-        case 'owner':
-          return ''
-        case 'token':
-          return 'mock-token'
-        case 'logging':
-          return 'false'
-        case 'filtered':
-          return 'false'
-        default:
-          return ''
-      }
-    })
+    mockInputs({token: 'mock-token', logging: 'false', filtered: 'false'})
 
     const coreInfoSpy = vi.spyOn(core, 'info')
 
@@ -113,21 +95,57 @@ describe('run', () => {
 
     expect(coreInfoSpy).toHaveBeenCalledWith('defaultRepo - default repo.')
     expect(coreInfoSpy).toHaveBeenCalledWith('defaultOwner - default owner.')
+    expect(coreInfoSpy).toHaveBeenCalledWith('defaultOwner/defaultRepo')
+    expect(coreInfoSpy).toHaveBeenCalledWith('1 repository registered.')
+    expect(coreInfoSpy).not.toHaveBeenCalledWith('1 repositories registered.')
+    expect(ReleaseAdapter).toHaveBeenCalledWith('mock-token', 'defaultOwner', [
+      'defaultRepo'
+    ])
+  })
+
+  it('should use default repo and owner when inputs are null', async () => {
+    mockInputs({token: 'mock-token', repo: null, owner: null})
+
+    await run()
+
+    expect(ReleaseAdapter).toHaveBeenCalledWith('mock-token', 'defaultOwner', [
+      'defaultRepo'
+    ])
+  })
+
+  it('should not log defaults when repo and owner are provided', async () => {
+    mockInputs({token: 'mock-token', repo: 'repo1', owner: 'testOwner'})
+    const coreInfoSpy = vi.spyOn(core, 'info')
+
+    await run()
+
+    expect(coreInfoSpy).not.toHaveBeenCalledWith('defaultRepo - default repo.')
+    expect(coreInfoSpy).not.toHaveBeenCalledWith(
+      'defaultOwner - default owner.'
+    )
+    expect(ReleaseAdapter).toHaveBeenCalledWith('mock-token', 'testOwner', [
+      'repo1'
+    ])
+  })
+
+  it('should parse bracketed, newline and comma separated repos and trim them', async () => {
+    mockInputs({
+      token: 'mock-token',
+      owner: 'testOwner',
+      repo: '[ repo1 , repo2]\nrepo3,,'
+    })
+
+    await run()
+
+    expect(ReleaseAdapter).toHaveBeenCalledWith('mock-token', 'testOwner', [
+      'repo1',
+      'repo2',
+      'repo3'
+    ])
   })
 
   it('should handle multiple repositories correctly', async () => {
-    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      switch (name) {
-        case 'repo':
-          return 'repo1,repo2'
-        case 'owner':
-          return 'testOwner'
-        case 'token':
-          return 'mock-token'
-        default:
-          return ''
-      }
-    })
+    mockInputs({token: 'mock-token', owner: 'testOwner', repo: 'repo1,repo2'})
 
     const coreInfoSpy = vi.spyOn(core, 'info')
 
@@ -136,6 +154,7 @@ describe('run', () => {
     expect(coreInfoSpy).toHaveBeenCalledWith('testOwner/repo1')
     expect(coreInfoSpy).toHaveBeenCalledWith('testOwner/repo2')
     expect(coreInfoSpy).toHaveBeenCalledWith('2 repositories registered.')
+    expect(coreInfoSpy).not.toHaveBeenCalledWith('2 repository registered.')
   })
 
   it('should set correct outputs for deploy-rate, lead-time, and logs', async () => {
@@ -232,52 +251,57 @@ describe('run', () => {
     const coreSetFailedSpy = vi.spyOn(core, 'setFailed')
     ;(
       ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
-    ).mockRejectedValue(new Error('Failed to fetch releases'))
+    ).mockRejectedValueOnce(new Error('Failed to fetch releases'))
 
     await run()
 
     expect(coreSetFailedSpy).toHaveBeenCalledWith('Failed to fetch releases')
   })
   it("should set filtered to true when 'filtered' input is 'true'", async () => {
-    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      if (name === 'filtered') {
-        return 'true'
-      }
-      return ''
-    })
+    mockInputs({token: 't', repo: 'repo1', owner: 'o', filtered: 'true'})
 
     await run()
 
-    expect(core.getInput).toHaveBeenCalledWith('filtered')
-    // You would test the value of filtered indirectly via your logic (mocking, checking calls, etc.)
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(LeadTime.prototype.getLeadTime as Mock).toHaveBeenCalledWith(true)
   })
 
   it("should set filtered to false when 'filtered' input is 'false'", async () => {
-    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      if (name === 'filtered') {
-        return 'false'
-      }
-      return ''
-    })
+    mockInputs({token: 't', repo: 'repo1', owner: 'o', filtered: 'false'})
 
     await run()
 
-    expect(core.getInput).toHaveBeenCalledWith('filtered')
-    // You would test the value of filtered indirectly via your logic (mocking, checking calls, etc.)
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(LeadTime.prototype.getLeadTime as Mock).toHaveBeenCalledWith(false)
   })
 
   it("should set filtered to false when 'filtered' input is anything other than 'true'", async () => {
-    vi.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      if (name === 'filtered') {
-        return 'someOtherValue'
-      }
-      return ''
-    })
+    mockInputs({token: 't', repo: 'repo1', owner: 'o', filtered: ''})
 
     await run()
 
-    expect(core.getInput).toHaveBeenCalledWith('filtered')
-    // You would test the value of filtered indirectly via your logic (mocking, checking calls, etc.)
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(LeadTime.prototype.getLeadTime as Mock).toHaveBeenCalledWith(false)
+  })
+
+  it('should not set log outputs when logging is not enabled', async () => {
+    mockInputs({token: 't', repo: 'repo1', owner: 'o', logging: 'false'})
+    ;(DeployFrequency.prototype.rate as Mock).mockReturnValue(5)
+    ;(LeadTime.prototype.getLeadTime as Mock).mockResolvedValue(10)
+    const coreSetOutputSpy = vi.spyOn(core, 'setOutput')
+
+    await run()
+
+    expect(coreSetOutputSpy).toHaveBeenCalledWith('deploy-rate', 5)
+    expect(coreSetOutputSpy).toHaveBeenCalledWith('lead-time', 10)
+    expect(coreSetOutputSpy).not.toHaveBeenCalledWith(
+      'deploy-rate-log',
+      expect.anything()
+    )
+    expect(coreSetOutputSpy).not.toHaveBeenCalledWith(
+      'lead-time-log',
+      expect.anything()
+    )
   })
 
   it("should pass the 'bug-label' input to ChangeFailureRate and MeanTimeToRestore", async () => {

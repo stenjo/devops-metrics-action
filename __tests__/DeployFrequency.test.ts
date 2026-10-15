@@ -116,4 +116,23 @@ describe('Deploy frequency should', () => {
       }).length
     ).toBe(6)
   })
+
+  it('log release name and date weekly', () => {
+    const df = new DeployFrequency(releaseList2, '2023-04-23T22:33:11Z')
+
+    df.weekly()
+
+    expect(df.getLog()).toEqual(['release->  v0.0.2:2023-04-22T20:28:29Z'])
+  })
+
+  it('log release name and date monthly', () => {
+    const df = new DeployFrequency(releaseList2, '2023-04-23T22:33:11Z')
+
+    df.monthly()
+
+    expect(df.getLog()).toEqual([
+      'release->  v0.0.2:2023-04-22T20:28:29Z',
+      'release->  v0.0.1:2023-04-12T22:33:24Z'
+    ])
+  })
 })

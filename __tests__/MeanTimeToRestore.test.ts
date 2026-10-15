@@ -376,6 +376,102 @@ describe('MeanTimeToRestore should', () => {
     expect(meanTime).toBe(0)
   })
 
+  it('throw exception when release list is null', () => {
+    const t = (): void => {
+      new MeanTimeToRestore(issues, null as unknown as Release[])
+    }
+
+    expect(t).toThrow('Empty release list')
+  })
+
+  describe('release boundaries', () => {
+    const first = +new Date('2023-04-12T22:33:24Z')
+    const second = +new Date('2023-04-22T20:28:29Z')
+    const third = +new Date('2023-04-29T06:18:36Z')
+    const last = +new Date('2023-04-30T17:29:44Z')
+    const repo = 'devops-metrics-action'
+
+    it('not count a release published at the exact date as previous', () => {
+      expect(mttr.hasPreviousRelease(first, repo)).toBe(false)
+      expect(mttr.hasPreviousRelease(first + 1, repo)).toBe(true)
+    })
+
+    it('not count releases of other repos as previous', () => {
+      expect(mttr.hasPreviousRelease(last + 1, 'unknown-repo')).toBe(false)
+    })
+
+    it('not count a release published at the exact date as later', () => {
+      expect(mttr.hasLaterRelease(last, repo)).toBe(false)
+      expect(mttr.hasLaterRelease(last - 1, repo)).toBe(true)
+    })
+
+    it('skip the release published at the exact date in getReleaseBefore', () => {
+      expect(mttr.getReleaseBefore(second, repo).published).toBe(first)
+      expect(mttr.getReleaseBefore(second + 1, repo).published).toBe(second)
+    })
+
+    it('skip the release published at the exact date in getReleaseAfter', () => {
+      expect(mttr.getReleaseAfter(second, repo).published).toBe(third)
+      expect(mttr.getReleaseAfter(second - 1, repo).published).toBe(second)
+    })
+  })
+
+  describe('bug selection', () => {
+    const localReleases = [
+      {
+        url: 'https://api.github.com/repos/stenjo/dora/releases/1',
+        published_at: '2023-03-25T00:00:00Z'
+      },
+      {
+        url: 'https://api.github.com/repos/stenjo/dora/releases/2',
+        published_at: '2023-04-30T00:00:00Z'
+      }
+    ] as Release[]
+    const today = new Date('2023-05-01T00:00:00Z')
+
+    it('ignore bugs that are still open', () => {
+      const bugs = [
+        {
+          created_at: '2023-04-10T00:00:00Z',
+          closed_at: null,
+          labels: [{name: 'bug'}],
+          repository_url: 'https://api.github.com/repos/stenjo/dora'
+        }
+      ] as Issue[]
+      const m = new MeanTimeToRestore(bugs, localReleases, today)
+
+      expect(m.getBugCount()).toEqual([])
+      expect(m.mttr()).toBe(0)
+    })
+
+    it('ignore bugs created 30 days ago or earlier', () => {
+      const bug = {
+        closed_at: '2023-04-20T00:00:00Z',
+        labels: [{name: 'bug'}],
+        repository_url: 'https://api.github.com/repos/stenjo/dora'
+      }
+      const onBoundary = new MeanTimeToRestore(
+        [{...bug, created_at: '2023-04-01T00:00:00Z'}] as Issue[],
+        localReleases,
+        today
+      )
+      const older = new MeanTimeToRestore(
+        [{...bug, created_at: '2023-03-28T00:00:00Z'}] as Issue[],
+        localReleases,
+        today
+      )
+      const inside = new MeanTimeToRestore(
+        [{...bug, created_at: '2023-04-01T00:00:01Z'}] as Issue[],
+        localReleases,
+        today
+      )
+
+      expect(onBoundary.getBugCount()).toEqual([])
+      expect(older.getBugCount()).toEqual([])
+      expect(inside.getBugCount().length).toBe(1)
+    })
+  })
+
   describe('with a custom bug label', () => {
     const localReleases = [
       {

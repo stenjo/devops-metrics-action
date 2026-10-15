@@ -3,6 +3,8 @@ import fs from 'fs'
 import {ChangeFailureRate} from '../src/ChangeFailureRate'
 import {Release} from '../src/types/Release'
 
+const ONE_DAY = 24 * 60 * 60 * 1000
+
 describe('ChangeFailureRate should', () => {
   it('get number of bugs created', () => {
     const issues: Issue[] = JSON.parse(
@@ -99,6 +101,93 @@ describe('ChangeFailureRate should', () => {
     const value = cfr.Cfr()
 
     expect(value).toBe(100)
+    expect(cfr.repos).toEqual(['dora'])
+  })
+
+  describe('boundaries', () => {
+    const today = new Date('2023-05-01T00:00:00Z')
+    const dora = 'https://api.github.com/repos/stenjo/dora'
+    const bug = (created_at: string, repo = dora): Issue =>
+      ({created_at, labels: [{name: 'bug'}], repository_url: repo}) as Issue
+    const release = (published_at: string, repo = dora): Release =>
+      ({url: `${repo}/releases/1`, published_at}) as Release
+
+    it('exclude releases published exactly 31 days ago', () => {
+      const onBoundary = new ChangeFailureRate(
+        [bug('2023-04-15T00:00:00Z')],
+        [release('2023-03-31T00:00:00Z')],
+        today
+      )
+      const inside = new ChangeFailureRate(
+        [bug('2023-04-15T00:00:00Z')],
+        [release('2023-03-31T00:00:01Z')],
+        today
+      )
+
+      expect(onBoundary.Cfr()).toBe(0)
+      expect(inside.Cfr()).toBe(100)
+    })
+
+    it('not count a bug created at the exact release time', () => {
+      const releases = [
+        release('2023-04-10T00:00:00Z'),
+        release('2023-04-20T00:00:00Z')
+      ]
+      const atFirst = new ChangeFailureRate(
+        [bug('2023-04-10T00:00:00Z')],
+        [...releases],
+        today
+      )
+      const atSecond = new ChangeFailureRate(
+        [bug('2023-04-20T00:00:00Z')],
+        [...releases],
+        today
+      )
+
+      expect(atFirst.Cfr()).toBe(0)
+      expect(atSecond.Cfr()).toBe(0)
+    })
+
+    it('sort releases by date before pairing them', () => {
+      const releases = [
+        release('2023-04-10T00:00:00Z'),
+        release('2023-04-20T00:00:00Z'),
+        release('2023-04-30T00:00:00Z')
+      ]
+      const cfr = new ChangeFailureRate(
+        [bug('2023-04-15T00:00:00Z'), bug('2023-04-25T00:00:00Z')],
+        releases,
+        today
+      )
+
+      expect(cfr.Cfr()).toBe(67)
+    })
+
+    it('not attribute bugs from another repo to this repo releases', () => {
+      const other = 'https://api.github.com/repos/stenjo/other'
+      const releases = [
+        release('2023-04-10T00:00:00Z'),
+        release('2023-04-20T00:00:00Z'),
+        release('2023-04-12T00:00:00Z', other)
+      ]
+      const cfr = new ChangeFailureRate(
+        [bug('2023-04-25T00:00:00Z'), bug('2023-04-15T00:00:00Z', other)],
+        releases,
+        today
+      )
+
+      expect(cfr.Cfr()).toBe(67)
+    })
+
+    it('ignore bugs created in the future without failing', () => {
+      const now = Date.now()
+      const cfr = new ChangeFailureRate(
+        [bug(new Date(now + ONE_DAY).toISOString())],
+        [release(new Date(now - ONE_DAY).toISOString())]
+      )
+
+      expect(cfr.Cfr()).toBe(0)
+    })
   })
 
   it('calculate 0% failures on 1 issues on 1 release when more than a month ago', () => {

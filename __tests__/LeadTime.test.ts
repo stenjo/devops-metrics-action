@@ -698,6 +698,173 @@ describe('LeadTime should', () => {
     expect(leadTime).toBe(0)
   })
 
+  describe('edge cases', () => {
+    const repoRelease = {
+      url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/1',
+      name: 'v1.0.0',
+      published_at: '2023-04-30T17:50:53Z'
+    } as Release
+    const today = new Date('2023-05-01T00:00:00Z')
+    const mainPull = {
+      merged_at: '2023-04-28T17:50:53Z',
+      commits_url: '47',
+      base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
+      title: 'feat: something'
+    } as PullRequest
+    const adapter: CommitsAdapter = new CommitsAdapter('')
+    adapter.getCommitsFromUrl = vi.fn(
+      async (url: string): Promise<Commit[] | undefined> => getCommits(url)
+    )
+
+    it('exclude a pull merged exactly 31 days ago', async () => {
+      const pulls = [
+        {...mainPull, merged_at: '2023-03-31T00:00:00Z'}
+      ] as PullRequest[]
+      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+
+      expect(await lt.getLeadTime()).toBe(0)
+      expect(lt.getLog()).toEqual([])
+    })
+
+    it('include a pull merged just under 31 days ago', async () => {
+      const pulls = [
+        {...mainPull, merged_at: '2023-03-31T00:00:01Z'}
+      ] as PullRequest[]
+      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+
+      expect(await lt.getLeadTime()).toBeGreaterThan(0)
+    })
+
+    it('not write the filtered log line when there are no pulls', async () => {
+      const lt = new LeadTime([], [repoRelease], adapter, today)
+
+      expect(await lt.getLeadTime(true)).toBe(0)
+      expect(lt.getLog()).toEqual([])
+    })
+
+    it('not write the filtered log line when there are no releases', async () => {
+      const lt = new LeadTime([mainPull], [], adapter, today)
+
+      expect(await lt.getLeadTime(true)).toBe(0)
+      expect(lt.getLog()).toEqual([])
+    })
+
+    it('write the filtered log line first only when filtered', async () => {
+      const filtered = new LeadTime([mainPull], [repoRelease], adapter, today)
+      await filtered.getLeadTime(true)
+      const unfiltered = new LeadTime([mainPull], [repoRelease], adapter, today)
+      await unfiltered.getLeadTime(false)
+
+      expect(filtered.getLog()[0]).toBe(
+        `\nLog is filtered - only feat and fix.`
+      )
+      expect(unfiltered.getLog()).not.toContain(
+        `\nLog is filtered - only feat and fix.`
+      )
+    })
+
+    it('ignore a pull whose merged_at is not a string', async () => {
+      const pulls = [
+        {...mainPull, merged_at: +new Date('2023-04-28T17:50:53Z')}
+      ] as unknown as PullRequest[]
+      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+
+      expect(await lt.getLeadTime()).toBe(0)
+    })
+
+    it('ignore a pull whose repo name is empty', async () => {
+      const pulls = [
+        {...mainPull, base: {ref: 'main', repo: {name: ''}}}
+      ] as PullRequest[]
+      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+
+      expect(await lt.getLeadTime()).toBe(0)
+    })
+
+    it('ignore a pull whose repo name is not a string', async () => {
+      const pulls = [
+        {...mainPull, base: {ref: 'main', repo: {name: 1}}}
+      ] as unknown as PullRequest[]
+      const release = {...repoRelease, url: 'https://x/repos/o/1/releases/1'}
+      const lt = new LeadTime(pulls, [release], adapter, today)
+
+      expect(await lt.getLeadTime()).toBe(0)
+    })
+
+    it('ignore a pull not merged to main even when releases exist', async () => {
+      const pulls = [
+        {
+          ...mainPull,
+          base: {ref: 'develop', repo: {name: 'devops-metrics-action'}}
+        }
+      ] as PullRequest[]
+      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+
+      expect(await lt.getLeadTime()).toBe(0)
+    })
+
+    it('ignore a release published at the exact merge time', async () => {
+      const release = {...repoRelease, published_at: mainPull.merged_at}
+      const lt = new LeadTime([mainPull], [release], adapter, today)
+
+      expect(await lt.getLeadTime()).toBe(0)
+    })
+
+    it('only match titles starting with feat or fix when filtered', async () => {
+      const pulls = [
+        {...mainPull, title: 'chore: hotfix'},
+        {...mainPull, title: 'fix: real'},
+        {...mainPull, title: 'feat: real'},
+        {...mainPull, title: 'refactor: feat'}
+      ] as PullRequest[]
+      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+      await lt.getLeadTime(true)
+
+      const pullLines = lt.getLog().filter(l => l.startsWith('pull->'))
+      expect(pullLines).toEqual([
+        'pull->      2023-04-28T17:50:53Z : fix: real',
+        'pull->      2023-04-28T17:50:53Z : feat: real'
+      ])
+    })
+
+    it('log the earliest commit even when commits are unsorted', async () => {
+      adapter.getCommitsFromUrl = vi.fn(
+        async (): Promise<Commit[]> =>
+          [
+            {
+              commit: {
+                committer: {date: '2023-04-25T00:00:00Z'},
+                message: 'later'
+              }
+            },
+            {
+              commit: {
+                committer: {date: '2023-04-20T00:00:00Z'},
+                message: 'first'
+              }
+            },
+            {
+              commit: {
+                committer: {date: '2023-04-22T00:00:00Z'},
+                message: 'middle'
+              }
+            }
+          ] as Commit[]
+      )
+      const lt = new LeadTime([mainPull], [repoRelease], adapter, today)
+
+      const leadTime = await lt.getLeadTime()
+
+      expect(leadTime).toBe(10.74)
+      expect(lt.getLog()).toEqual([
+        'pull->      2023-04-28T17:50:53Z : feat: something',
+        '  commit->  2023-04-20T00:00:00Z : first',
+        '  release-> 2023-04-30T17:50:53Z : v1.0.0',
+        '  10.74 days'
+      ])
+    })
+  })
+
   // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
   async function getCommits(url: string): Promise<Commit[]> {
     if (url === '10') {
