@@ -1,4 +1,5 @@
 import {CommitsAdapter} from '../src/CommitsAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import type {Commit} from '../src/types/Commit'
 import fs from 'node:fs'
 import * as dotenv from 'dotenv'
@@ -6,19 +7,14 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 
 test('fetches commits', async () => {
-  const adapter = new CommitsAdapter(process.env.GH_TOKEN)
-  const getCommitsMock = vi.spyOn(
-    // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-    CommitsAdapter.prototype as any,
-    'getCommits'
-  )
-  getCommitsMock.mockImplementation(async (): Promise<Commit[] | undefined> => {
-    return Promise.resolve(
+  const client = new GitHubClient({token: process.env.GH_TOKEN})
+  const adapter = new CommitsAdapter(client)
+  vi.spyOn(client, 'request').mockImplementation(
+    async (): Promise<Commit[]> =>
       JSON.parse(
         fs.readFileSync('./__tests__/test-data/commits.json').toString()
-      ) as Commit[] | undefined
-    )
-  })
+      ) as Commit[]
+  )
 
   const cl = (await adapter.getCommitsFromUrl('10')) as Commit[]
 
@@ -27,7 +23,7 @@ test('fetches commits', async () => {
 })
 
 test('CommitsAdapter should', async () => {
-  const ca = new CommitsAdapter(process.env.GH_TOKEN)
+  const ca = new CommitsAdapter(new GitHubClient({token: process.env.GH_TOKEN}))
 
   const result = await ca.getCommitsFromUrl(
     'https://api.github.com/repos/stenjo/devops-metrics-action/pulls/69/commits'

@@ -2,6 +2,7 @@ import {http, HttpResponse} from 'msw'
 import {setupServer} from 'msw/node'
 import {setFailed} from '@actions/core'
 import {ReleaseAdapter} from '../src/ReleaseAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import type {Release} from '../src/types/Release'
 import type {Person} from '../src/types/Person'
 
@@ -76,7 +77,7 @@ describe('Release Adapter should', () => {
   })
 
   it('return paged values', async () => {
-    const r = new ReleaseAdapter(undefined, 'test-owner', ['project1'])
+    const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
 
     const releases: Release[] = (await r.GetAllReleasesLastMonth()) as Release[]
 
@@ -94,7 +95,11 @@ describe('Release Adapter should', () => {
         }
       )
     )
-    const r = new ReleaseAdapter('my-token', 'test-owner', ['project1'])
+    const r = new ReleaseAdapter(
+      new GitHubClient({token: 'my-token'}),
+      'test-owner',
+      ['project1']
+    )
     r.today = new Date('2024-03-01T12:00:00Z')
 
     await r.GetAllReleasesLastMonth()
@@ -123,7 +128,7 @@ describe('Release Adapter should', () => {
         }
       )
     )
-    const r = new ReleaseAdapter(undefined, 'test-owner', ['project1'])
+    const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
 
     const releases = (await r.GetAllReleasesLastMonth()) as Release[]
 
@@ -146,7 +151,7 @@ describe('Release Adapter should', () => {
       )
     )
     errorServer.listen()
-    const r = new ReleaseAdapter(undefined, 'test-owner', ['project1'])
+    const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
     const result = await r.GetAllReleasesLastMonth()
 
     expect(result).toBe(undefined)

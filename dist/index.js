@@ -37179,14 +37179,13 @@ function getOctokit(token, options, ...additionalPlugins) {
 //# sourceMappingURL=github.js.map
 ;// CONCATENATED MODULE: ./src/ReleaseAdapter.ts
 
-
 class ReleaseAdapter {
-    token;
+    client;
     owner;
     repositories;
     today;
-    constructor(token, owner, repositories) {
-        this.token = token;
+    constructor(client, owner, repositories) {
+        this.client = client;
         this.owner = owner;
         this.repositories = repositories;
         this.today = new Date();
@@ -37194,17 +37193,9 @@ class ReleaseAdapter {
     async GetAllReleasesLastMonth() {
         const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
         try {
-            const octokit = new Octokit({
-                auth: this.token
-            });
             let result = [];
             for (const repo of this.repositories) {
-                let nextPage = await this.getReleases(octokit, repo, since, 1);
-                result = result.concat(nextPage);
-                for (let page = 2; page < 100 && nextPage.length === 100; page++) {
-                    nextPage = await this.getReleases(octokit, repo, since, page);
-                    result = result.concat(nextPage);
-                }
+                result = result.concat(await this.client.paginate('GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() }));
             }
             return result;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37212,19 +37203,6 @@ class ReleaseAdapter {
         catch (e) {
             setFailed(e.message);
         }
-    }
-    async getReleases(octokit, repo, since, page) {
-        const result = await octokit.request('GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}', {
-            owner: this.owner,
-            repo,
-            headers: {
-                'X-GitHub-Api-Version': '2022-11-28'
-            },
-            since: since.toISOString(),
-            per_page: 100,
-            page
-        });
-        return Promise.resolve(result.data);
     }
 }
 
@@ -37348,14 +37326,13 @@ class ChangeFailureRate {
 ;// CONCATENATED MODULE: ./src/IssuesAdapter.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-
 class IssuesAdapter {
-    token;
+    client;
     owner;
     repositories;
     today;
-    constructor(token, owner, repositories) {
-        this.token = token;
+    constructor(client, owner, repositories) {
+        this.client = client;
         this.owner = owner;
         this.repositories = repositories;
         this.today = new Date();
@@ -37363,36 +37340,15 @@ class IssuesAdapter {
     async GetAllIssuesLastMonth() {
         const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
         try {
-            const octokit = new Octokit({
-                auth: this.token
-            });
             let result = [];
             for (const repo of this.repositories) {
-                let nextPage = await this.getIssues(octokit, repo, since, 1);
-                result = result.concat(nextPage);
-                for (let page = 2; page < 100 && nextPage.length === 100; page++) {
-                    nextPage = await this.getIssues(octokit, repo, since, page);
-                    result = result.concat(nextPage);
-                }
+                result = result.concat(await this.client.paginate('GET /repos/{owner}/{repo}/issues?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() }));
             }
             return result;
         }
         catch (e) {
             setFailed(e.message);
         }
-    }
-    async getIssues(octokit, repo, since, page) {
-        const result = await octokit.request('GET /repos/{owner}/{repo}/issues?state=all&since={since}&per_page={per_page}&page={page}', {
-            owner: this.owner,
-            repo,
-            headers: {
-                'X-GitHub-Api-Version': '2022-11-28'
-            },
-            since: since.toISOString(),
-            per_page: 100,
-            page
-        });
-        return Promise.resolve(result.data);
     }
 }
 
@@ -37502,14 +37458,13 @@ class MeanTimeToRestore {
 ;// CONCATENATED MODULE: ./src/PullRequestsAdapter.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-
 class PullRequestsAdapter {
-    token;
-    repositories;
+    client;
     owner;
+    repositories;
     today;
-    constructor(token, owner, repositories) {
-        this.token = token;
+    constructor(client, owner, repositories) {
+        this.client = client;
         this.owner = owner;
         this.repositories = repositories;
         this.today = new Date();
@@ -37517,68 +37472,33 @@ class PullRequestsAdapter {
     async GetAllPRsLastMonth() {
         const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
         try {
-            const octokit = new Octokit({
-                auth: this.token
-            });
             let result = [];
             for (const repo of this.repositories) {
-                let nextPage = await this.getPRs(octokit, repo, since, 1);
-                result = result.concat(nextPage);
-                for (let page = 2; page < 100 && nextPage.length === 100; page++) {
-                    nextPage = await this.getPRs(octokit, repo, since, page);
-                    result = result.concat(nextPage);
-                }
+                result = result.concat(await this.client.paginate('GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() }));
             }
             return result;
         }
         catch (e) {
             setFailed(e.message);
         }
-    }
-    async getPRs(octokit, repo, since, page) {
-        const result = await octokit.request('GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}', {
-            owner: this.owner,
-            repo,
-            headers: {
-                'X-GitHub-Api-Version': '2022-11-28'
-            },
-            since: since.toISOString(),
-            per_page: 100,
-            page
-        });
-        return Promise.resolve(result.data);
     }
 }
 
 ;// CONCATENATED MODULE: ./src/CommitsAdapter.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-
 class CommitsAdapter {
-    token;
-    octokit;
-    constructor(token) {
-        this.token = token;
-        this.octokit = new Octokit({
-            auth: this.token
-        });
+    client;
+    constructor(client) {
+        this.client = client;
     }
     async getCommitsFromUrl(url) {
         try {
-            const result = await this.getCommits(this.octokit, url);
-            return result;
+            return await this.client.request(url);
         }
         catch (e) {
             setFailed(e.message);
         }
-    }
-    async getCommits(octokit, url) {
-        const result = await octokit.request(url, {
-            headers: {
-                'X-GitHub-Api-Version': '2022-11-28'
-            }
-        });
-        return Promise.resolve(result.data);
     }
 }
 
@@ -37659,8 +37579,49 @@ class LeadTime {
     }
 }
 
+;// CONCATENATED MODULE: ./src/GitHubClient.ts
+
+class GitHubClient {
+    octokit;
+    constructor(options = {}) {
+        this.octokit = new Octokit({
+            auth: options.token,
+            ...(options.baseUrl !== undefined && { baseUrl: options.baseUrl })
+        });
+    }
+    async request(route, params = {}) {
+        const result = await this.octokit.request(route, {
+            ...params,
+            headers: { 'X-GitHub-Api-Version': '2022-11-28' }
+        });
+        return result.data;
+    }
+    async paginate(route, params = {}, options = {}) {
+        const perPage = 100;
+        const maxPages = 99;
+        let result = [];
+        for (let page = 1; page <= maxPages; page++) {
+            const items = await this.request(route, {
+                ...params,
+                per_page: perPage,
+                page
+            });
+            const stopAt = options.until ? items.findIndex(options.until) : -1;
+            if (stopAt >= 0) {
+                return result.concat(items.slice(0, stopAt));
+            }
+            result = result.concat(items);
+            if (items.length < perPage) {
+                break;
+            }
+        }
+        return result;
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/index.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 
 
@@ -37707,15 +37668,16 @@ async function run() {
         const logging = getInput('logging');
         const filtered = getInput('filtered') === 'true' ? true : false;
         const bugLabel = getInput('bug-label') || 'bug';
-        const rel = new ReleaseAdapter(token, owner, repositories);
+        const client = new GitHubClient({ token });
+        const rel = new ReleaseAdapter(client, owner, repositories);
         const releaseList = (await rel.GetAllReleasesLastMonth());
         const df = new DeployFrequency(releaseList);
         setOutput('deploy-rate', df.rate());
         if (logging === 'true') {
             setOutput('deploy-rate-log', df.getLog().join('\n'));
         }
-        const prs = new PullRequestsAdapter(token, owner, repositories);
-        const commits = new CommitsAdapter(token);
+        const prs = new PullRequestsAdapter(client, owner, repositories);
+        const commits = new CommitsAdapter(client);
         const pulls = (await prs.GetAllPRsLastMonth());
         const lt = new LeadTime(pulls, releaseList, commits);
         const leadTime = await lt.getLeadTime(filtered);
@@ -37723,7 +37685,7 @@ async function run() {
         if (logging === 'true') {
             setOutput('lead-time-log', lt.getLog().join('\n'));
         }
-        const issueAdapter = new IssuesAdapter(token, owner, repositories);
+        const issueAdapter = new IssuesAdapter(client, owner, repositories);
         const issueList = await issueAdapter.GetAllIssuesLastMonth();
         if (issueList) {
             const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel);

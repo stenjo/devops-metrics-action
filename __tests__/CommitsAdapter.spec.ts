@@ -1,4 +1,5 @@
 import {CommitsAdapter} from '../src/CommitsAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import {Octokit} from '@octokit/core'
 import * as core from '@actions/core'
 import type {Commit} from '../src/types/Commit'
@@ -7,7 +8,6 @@ vi.mock('@octokit/core')
 vi.mock('@actions/core')
 
 describe('CommitsAdapter', () => {
-  const token = 'test-token'
   let adapter: CommitsAdapter
   let mockRequest: Mock
 
@@ -16,24 +16,11 @@ describe('CommitsAdapter', () => {
     ;(Octokit as unknown as Mock).mockImplementation(function () {
       return {request: mockRequest}
     })
-    adapter = new CommitsAdapter(token)
+    adapter = new CommitsAdapter(new GitHubClient({token: 'test-token'}))
   })
 
   afterEach(() => {
     vi.clearAllMocks()
-  })
-
-  it('should initialize with the correct token', () => {
-    expect(Octokit).toHaveBeenCalledWith({
-      auth: token
-    })
-  })
-
-  it('should initialize with an undefined token', () => {
-    new CommitsAdapter(undefined)
-    expect(Octokit).toHaveBeenCalledWith({
-      auth: undefined
-    })
   })
 
   it('should fetch commits with the correct headers', async () => {
@@ -99,10 +86,10 @@ describe('CommitsAdapter', () => {
     expect(commits).toBeUndefined()
   })
 
-  it('should handle undefined token gracefully', () => {
-    const adapterWithoutToken = new CommitsAdapter(undefined)
-    expect(adapterWithoutToken.token).toBeUndefined()
-    expect(adapterWithoutToken.octokit).toBeDefined() // Octokit should still be initialized
+  it('should expose the injected client', () => {
+    const client = new GitHubClient()
+    const adapterWithClient = new CommitsAdapter(client)
+    expect(adapterWithClient.client).toBe(client)
   })
 
   it('should handle empty API response', async () => {

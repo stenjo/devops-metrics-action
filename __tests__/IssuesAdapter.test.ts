@@ -2,6 +2,7 @@ import {http, HttpResponse} from 'msw'
 import {setupServer} from 'msw/node'
 import {setFailed} from '@actions/core'
 import {IssuesAdapter} from '../src/IssuesAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import {Issue} from '../src/types/Issue'
 
 const server = setupServer(
@@ -39,7 +40,7 @@ describe('Issue Adapter should', () => {
   })
 
   it('return paged values', async () => {
-    const r = new IssuesAdapter(undefined, 'test-owner', ['project1'])
+    const r = new IssuesAdapter(new GitHubClient(), 'test-owner', ['project1'])
 
     const issues: Issue[] = (await r.GetAllIssuesLastMonth()) as Issue[]
 
@@ -57,7 +58,11 @@ describe('Issue Adapter should', () => {
         }
       )
     )
-    const r = new IssuesAdapter('my-token', 'test-owner', ['project1'])
+    const r = new IssuesAdapter(
+      new GitHubClient({token: 'my-token'}),
+      'test-owner',
+      ['project1']
+    )
     r.today = new Date('2024-03-01T12:00:00Z')
 
     await r.GetAllIssuesLastMonth()
@@ -86,7 +91,7 @@ describe('Issue Adapter should', () => {
         }
       )
     )
-    const r = new IssuesAdapter(undefined, 'test-owner', ['project1'])
+    const r = new IssuesAdapter(new GitHubClient(), 'test-owner', ['project1'])
 
     const issues = (await r.GetAllIssuesLastMonth()) as Issue[]
 
@@ -109,7 +114,7 @@ describe('Issue Adapter should', () => {
       )
     )
     errorServer.listen()
-    const r = new IssuesAdapter(undefined, 'test-owner', ['project1'])
+    const r = new IssuesAdapter(new GitHubClient(), 'test-owner', ['project1'])
     const result = await r.GetAllIssuesLastMonth()
     expect(result).toBe(undefined)
     expect(setFailed).toHaveBeenCalledWith('access denied')

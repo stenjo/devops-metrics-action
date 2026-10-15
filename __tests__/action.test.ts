@@ -8,6 +8,7 @@ import {MeanTimeToRestore} from '../src/MeanTimeToRestore'
 import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
 import {CommitsAdapter} from '../src/CommitsAdapter'
 import {LeadTime} from '../src/LeadTime'
+import {GitHubClient} from '../src/GitHubClient'
 import {run} from '../src/index'
 import type {Release} from '../src/types/Release'
 import type {PullRequest} from '../src/types/PullRequest'
@@ -23,6 +24,7 @@ vi.mock('../src/MeanTimeToRestore')
 vi.mock('../src/PullRequestsAdapter')
 vi.mock('../src/CommitsAdapter')
 vi.mock('../src/LeadTime')
+vi.mock('../src/GitHubClient')
 
 // Mocking github.context.repo as read-only
 const mockRepo = {owner: 'defaultOwner', repo: 'defaultRepo'}
@@ -34,6 +36,12 @@ function mockInputs(inputs: Record<string, string | null>): void {
   vi.spyOn(core, 'getInput').mockImplementation(
     (name: string) => (name in inputs ? inputs[name] : '') as string
   )
+}
+
+// The single client instance `run()` constructed in the current test.
+function theClient(): GitHubClient {
+  expect(GitHubClient).toHaveBeenCalledTimes(1)
+  return vi.mocked(GitHubClient).mock.instances[0]
 }
 
 describe('run', () => {
@@ -57,14 +65,12 @@ describe('run', () => {
 
     await run()
 
-    expect(ReleaseAdapter).toHaveBeenCalledWith('provided-token', 'o', [
-      'repo1'
-    ])
-    expect(PullRequestsAdapter).toHaveBeenCalledWith('provided-token', 'o', [
-      'repo1'
-    ])
-    expect(CommitsAdapter).toHaveBeenCalledWith('provided-token')
-    expect(IssuesAdapter).toHaveBeenCalledWith('provided-token', 'o', ['repo1'])
+    expect(GitHubClient).toHaveBeenCalledWith({token: 'provided-token'})
+    const client = theClient()
+    expect(ReleaseAdapter).toHaveBeenCalledWith(client, 'o', ['repo1'])
+    expect(PullRequestsAdapter).toHaveBeenCalledWith(client, 'o', ['repo1'])
+    expect(CommitsAdapter).toHaveBeenCalledWith(client)
+    expect(IssuesAdapter).toHaveBeenCalledWith(client, 'o', ['repo1'])
   })
 
   it('should fall back to GH_TOKEN environment variable if token input is empty', async () => {
@@ -73,8 +79,9 @@ describe('run', () => {
 
     await run()
 
-    expect(ReleaseAdapter).toHaveBeenCalledWith('env-token', 'o', ['repo1'])
-    expect(CommitsAdapter).toHaveBeenCalledWith('env-token')
+    expect(GitHubClient).toHaveBeenCalledWith({token: 'env-token'})
+    expect(ReleaseAdapter).toHaveBeenCalledWith(theClient(), 'o', ['repo1'])
+    expect(CommitsAdapter).toHaveBeenCalledWith(theClient())
   })
 
   it('should handle a null token input and fall back to GH_TOKEN environment variable', async () => {
@@ -83,7 +90,8 @@ describe('run', () => {
 
     await run()
 
-    expect(ReleaseAdapter).toHaveBeenCalledWith('env-token', 'o', ['repo1'])
+    expect(GitHubClient).toHaveBeenCalledWith({token: 'env-token'})
+    expect(ReleaseAdapter).toHaveBeenCalledWith(theClient(), 'o', ['repo1'])
   })
 
   it('should use default repo and owner when inputs are not provided', async () => {
@@ -98,7 +106,8 @@ describe('run', () => {
     expect(coreInfoSpy).toHaveBeenCalledWith('defaultOwner/defaultRepo')
     expect(coreInfoSpy).toHaveBeenCalledWith('1 repository registered.')
     expect(coreInfoSpy).not.toHaveBeenCalledWith('1 repositories registered.')
-    expect(ReleaseAdapter).toHaveBeenCalledWith('mock-token', 'defaultOwner', [
+    expect(GitHubClient).toHaveBeenCalledWith({token: 'mock-token'})
+    expect(ReleaseAdapter).toHaveBeenCalledWith(theClient(), 'defaultOwner', [
       'defaultRepo'
     ])
   })
@@ -108,7 +117,7 @@ describe('run', () => {
 
     await run()
 
-    expect(ReleaseAdapter).toHaveBeenCalledWith('mock-token', 'defaultOwner', [
+    expect(ReleaseAdapter).toHaveBeenCalledWith(theClient(), 'defaultOwner', [
       'defaultRepo'
     ])
   })
@@ -123,7 +132,7 @@ describe('run', () => {
     expect(coreInfoSpy).not.toHaveBeenCalledWith(
       'defaultOwner - default owner.'
     )
-    expect(ReleaseAdapter).toHaveBeenCalledWith('mock-token', 'testOwner', [
+    expect(ReleaseAdapter).toHaveBeenCalledWith(theClient(), 'testOwner', [
       'repo1'
     ])
   })
@@ -137,7 +146,7 @@ describe('run', () => {
 
     await run()
 
-    expect(ReleaseAdapter).toHaveBeenCalledWith('mock-token', 'testOwner', [
+    expect(ReleaseAdapter).toHaveBeenCalledWith(theClient(), 'testOwner', [
       'repo1',
       'repo2',
       'repo3'

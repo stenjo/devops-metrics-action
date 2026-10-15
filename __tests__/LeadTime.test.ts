@@ -1,11 +1,12 @@
 import {CommitsAdapter} from '../src/CommitsAdapter'
+import {GitHubClient} from '../src/GitHubClient'
 import type {Commit} from '../src/types/Commit'
 import type {PullRequest} from '../src/types/PullRequest'
 import type {Release} from '../src/types/Release'
 import {LeadTime} from '../src/LeadTime'
 
 describe('LeadTime should', () => {
-  const commitsAdapter: CommitsAdapter = new CommitsAdapter('')
+  const commitsAdapter: CommitsAdapter = new CommitsAdapter(new GitHubClient())
   commitsAdapter.getCommitsFromUrl = vi.fn(
     async (): Promise<Commit[] | undefined> => {
       return Promise.resolve([{}] as Commit[])
@@ -711,7 +712,7 @@ describe('LeadTime should', () => {
       base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
       title: 'feat: something'
     } as PullRequest
-    const adapter: CommitsAdapter = new CommitsAdapter('')
+    const adapter: CommitsAdapter = new CommitsAdapter(new GitHubClient())
     adapter.getCommitsFromUrl = vi.fn(
       async (url: string): Promise<Commit[] | undefined> => getCommits(url)
     )
