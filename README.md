@@ -43,7 +43,18 @@ Only one is handled.
 
 ### `token`
 
-Access token for the repository.
+Access token for the repository. Defaults to `${{ github.token }}`, so the
+common case needs no configuration. Resolution order is the `token` input,
+then the `GH_TOKEN` environment variable. The action fails fast if neither
+yields a token, rather than silently running unauthenticated. The resolved
+token is registered with the runner as a secret so it is masked in logs.
+
+To read metrics from other repositories than the one running the workflow,
+pass a token with read access to those repositories:
+
+```yaml
+token: ${{ secrets.METRICS_PAT }}
+```
 
 ### `logging`
 

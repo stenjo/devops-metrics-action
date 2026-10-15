@@ -14,7 +14,7 @@ import type {PullRequest} from './types/PullRequest'
 export interface Inputs {
   owner: string
   repositories: string[]
-  token: string | undefined
+  token: string
   logging: boolean
   filtered: boolean
   bugLabel: string
@@ -29,7 +29,13 @@ export interface Outputs {
   mttr: number | string
 }
 
-export type ActionsCore = Pick<typeof core, 'getInput' | 'info' | 'setOutput'>
+export type ActionsCore = Pick<
+  typeof core,
+  'getInput' | 'info' | 'setOutput' | 'setSecret'
+>
+
+export const TOKEN_REQUIRED_MESSAGE =
+  'A GitHub token is required: set the `token` input or the GH_TOKEN environment variable'
 
 export interface RepoContext {
   owner: string
@@ -48,7 +54,7 @@ export interface RunDeps {
 }
 
 export function parseInputs(
-  core: Pick<ActionsCore, 'getInput' | 'info'>,
+  core: Pick<ActionsCore, 'getInput' | 'info' | 'setSecret'>,
   context: ActionsContext,
   env: NodeJS.ProcessEnv
 ): Inputs {
@@ -85,6 +91,11 @@ export function parseInputs(
   if (token === '' || token === null) {
     token = env.GH_TOKEN
   }
+  if (token === undefined || token === '') {
+    throw new Error(TOKEN_REQUIRED_MESSAGE)
+  }
+  // The GH_TOKEN fallback is not masked by the runner unless registered here.
+  core.setSecret(token)
 
   return {
     owner,
