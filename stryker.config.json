@@ -12,6 +12,7 @@
     "prioritizePerformanceOverAccuracy": true
   },
   "ignoreStatic": true,
+  "thresholds": {"high": 95, "low": 90, "break": 90},
   "ignorePatterns": ["**/node_modules/**", "**/coverage/**"],
   "disableTypeChecks": "{test,src,lib}/**/*.{js,ts,jsx,tsx,html,vue,cts,mts}"
 }
