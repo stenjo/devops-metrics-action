@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/stenjo/devops-metrics-action/compare/v1.4.0...v1.4.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **auth:** fail fast when no token is available and register it with core.setSecret ([#469](https://github.com/stenjo/devops-metrics-action/issues/469)) ([145988f](https://github.com/stenjo/devops-metrics-action/commit/145988f92eb4e60a89c08912a923df98296caf35)), closes [#456](https://github.com/stenjo/devops-metrics-action/issues/456)
+
 ## [1.4.0](https://github.com/stenjo/devops-metrics-action/compare/v1.3.5...v1.4.0) (2026-09-24)
 
 
