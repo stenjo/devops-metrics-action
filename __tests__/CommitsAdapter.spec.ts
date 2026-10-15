@@ -2,7 +2,7 @@ import {CommitsAdapter} from '../src/CommitsAdapter'
 import {GitHubClient} from '../src/GitHubClient'
 import {Octokit} from '@octokit/core'
 import * as core from '@actions/core'
-import type {Commit} from '../src/types/Commit'
+import {commitPayload} from './helpers/payloads'
 
 vi.mock('@octokit/core')
 vi.mock('@actions/core')
@@ -23,18 +23,20 @@ describe('CommitsAdapter', () => {
     vi.clearAllMocks()
   })
 
-  it('should fetch commits with the correct headers', async () => {
+  it('should fetch commits with the correct headers and map them', async () => {
     const url = 'https://api.github.com/repos/owner/repo/commits'
-    // mock commit data
-    const mockCommits: Commit[] = [{}]
-    mockRequest.mockResolvedValue({data: mockCommits})
+    mockRequest.mockResolvedValue({
+      data: [commitPayload('2023-04-22T17:50:53Z', 'fix: it')]
+    })
 
     const commits = await adapter.getCommitsFromUrl(url)
 
     expect(mockRequest).toHaveBeenCalledWith(url, {
       headers: {'X-GitHub-Api-Version': '2022-11-28'}
     })
-    expect(commits).toEqual(mockCommits)
+    expect(commits).toEqual([
+      {committedAt: +new Date('2023-04-22T17:50:53Z'), message: 'fix: it'}
+    ])
   })
 
   it('should handle missing or incorrect headers', async () => {
@@ -47,8 +49,7 @@ describe('CommitsAdapter', () => {
         throw new Error('Incorrect headers')
       }
       return {
-        // mock commit data
-        data: [{}]
+        data: [commitPayload()]
       }
     })
 

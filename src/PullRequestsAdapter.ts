@@ -3,6 +3,8 @@ import * as core from '@actions/core'
 import type {IPullRequestsAdapter} from './interfaces/IPullRequestsAdapter'
 import type {PullRequest} from './types/PullRequest'
 import type {GitHubClient} from './GitHubClient'
+import type {GitHubPullRequestPayload} from './github/payloads'
+import {toPullRequest} from './github/mappers'
 
 export class PullRequestsAdapter implements IPullRequestsAdapter {
   client: GitHubClient
@@ -22,11 +24,12 @@ export class PullRequestsAdapter implements IPullRequestsAdapter {
     try {
       let result: PullRequest[] = []
       for (const repo of this.repositories) {
+        const payloads = await this.client.paginate<GitHubPullRequestPayload>(
+          'GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}',
+          {owner: this.owner, repo, since: since.toISOString()}
+        )
         result = result.concat(
-          await this.client.paginate<PullRequest>(
-            'GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}',
-            {owner: this.owner, repo, since: since.toISOString()}
-          )
+          payloads.map(payload => toPullRequest(this.owner, repo, payload))
         )
       }
       return result

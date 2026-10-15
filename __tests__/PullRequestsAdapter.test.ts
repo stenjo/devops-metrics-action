@@ -4,6 +4,8 @@ import {setFailed} from '@actions/core'
 import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
 import {GitHubClient} from '../src/GitHubClient'
 import type {PullRequest} from '../src/types/PullRequest'
+import type {GitHubPullRequestPayload} from '../src/github/payloads'
+import {pullRequestPayload} from './helpers/payloads'
 
 const server = setupServer(
   http.get(
@@ -12,9 +14,9 @@ const server = setupServer(
     ({request, params, cookies}) => {
       const url = new URL(request.url)
       const page = url.searchParams.getAll('page')
-      const pullRequests: PullRequest[] = []
+      const pullRequests: GitHubPullRequestPayload[] = []
       for (let i = 0; i < (+page < 2 ? 100 : 50); i++) {
-        pullRequests.push({id: i} as PullRequest)
+        pullRequests.push(pullRequestPayload({id: i}))
       }
       return HttpResponse.json(pullRequests)
     }
@@ -89,7 +91,7 @@ describe('PullRequest Adapter should', () => {
         ({request}) => {
           pages.push(new URL(request.url).searchParams.get('page') as string)
           return HttpResponse.json(
-            Array.from({length: 100}, (_, i) => ({id: i}))
+            Array.from({length: 100}, (_, i) => pullRequestPayload({id: i}))
           )
         }
       )

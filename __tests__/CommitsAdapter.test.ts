@@ -4,7 +4,8 @@ import {setFailed} from '@actions/core'
 import {CommitsAdapter} from '../src/CommitsAdapter'
 import {GitHubClient} from '../src/GitHubClient'
 import fs from 'fs'
-import {Commit} from '../src/types/Commit'
+import type {Commit} from '../src/types/Commit'
+import type {GitHubCommitPayload} from '../src/github/payloads'
 
 const commitsUrl =
   'https://api.github.com/repos/stenjo/devops-metrics-action/pulls/69/commits'
@@ -13,9 +14,9 @@ const server = setupServer(
     commitsUrl,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ({request, params, cookies}) => {
-      const commits: Commit[] = JSON.parse(
+      const commits = JSON.parse(
         fs.readFileSync('./__tests__/test-data/commits.json').toString()
-      ) as Commit[]
+      ) as GitHubCommitPayload[]
       return HttpResponse.json(commits)
     }
   )
@@ -40,11 +41,15 @@ describe('Commit Adapter should', () => {
   it('return unpaged values', async () => {
     const r = new CommitsAdapter(new GitHubClient())
 
-    const releases: Commit[] = (await r.getCommitsFromUrl(
+    const commits: Commit[] = (await r.getCommitsFromUrl(
       commitsUrl
     )) as Commit[]
 
-    expect(releases.length).toBe(30)
+    expect(commits.length).toBe(30)
+    expect(commits[0]).toEqual({
+      committedAt: +new Date('2023-04-22T20:41:12Z'),
+      message: 'fix: clean up'
+    })
   })
 
   it('handles access denied', async () => {

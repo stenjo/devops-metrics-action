@@ -1,6 +1,7 @@
 //
 
-import {Release} from './types/Release'
+import type {Release} from './types/Release'
+import {isoTimestamp} from './types/Timestamp'
 
 // The number of milliseconds in one day
 const ONE_DAY = 1000 * 60 * 60 * 24
@@ -28,9 +29,11 @@ export class DeployFrequency {
   weekly(): number {
     let releaseCount = 0
     for (const release of this.rList) {
-      const relDate = new Date(release.published_at)
+      const relDate = new Date(release.publishedAt)
       if (this.days_between(this.today, relDate) < 8) {
-        this.log.push(`release->  ${release.name}:${release.published_at}`)
+        this.log.push(
+          `release->  ${release.name}:${isoTimestamp(release.publishedAt)}`
+        )
         releaseCount++
       }
     }
@@ -41,9 +44,11 @@ export class DeployFrequency {
   monthly(): number {
     let releaseCount = 0
     for (const release of this.rList) {
-      const relDate = new Date(release.published_at)
+      const relDate = new Date(release.publishedAt)
       if (this.days_between(this.today, relDate) < 31) {
-        this.log.push(`release->  ${release.name}:${release.published_at}`)
+        this.log.push(
+          `release->  ${release.name}:${isoTimestamp(release.publishedAt)}`
+        )
         releaseCount++
       }
     }

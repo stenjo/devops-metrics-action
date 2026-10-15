@@ -1,11 +1,12 @@
 import type {Issue} from './types/Issue'
 import type {Release} from './types/Release'
+import type {RepoKey} from './types/RepoKey'
 
 export class ChangeFailureRate {
   today: Date
   issues: Issue[]
   releases: Release[]
-  repos: string[]
+  repos: RepoKey[]
   bugLabel: string
 
   constructor(
@@ -18,13 +19,9 @@ export class ChangeFailureRate {
     this.issues = issues
     this.bugLabel = bugLabel
     this.releases = releases
-      .sort((a, b) =>
-        +new Date(a.published_at) < +new Date(b.published_at) ? -1 : 1
-      )
+      .sort((a, b) => (a.publishedAt < b.publishedAt ? -1 : 1))
       .filter(
-        r =>
-          +new Date(r.published_at) >
-          this.today.valueOf() - 31 * 24 * 60 * 60 * 1000
+        r => r.publishedAt > this.today.valueOf() - 31 * 24 * 60 * 60 * 1000
       )
     this.repos = []
   }
@@ -32,9 +29,7 @@ export class ChangeFailureRate {
   getBugs(): Issue[] {
     const bugs: Issue[] = []
     for (const issue of this.issues) {
-      if (
-        issue.labels.filter(label => label.name === this.bugLabel).length > 0
-      ) {
+      if (issue.labels.includes(this.bugLabel)) {
         bugs.push(issue)
       }
     }
@@ -49,34 +44,28 @@ export class ChangeFailureRate {
     const bugs = this.getBugs()
 
     for (const bug of bugs) {
-      const repo = bug.repository_url.split('/').reverse()[0]
-      if (!this.repos.includes(repo)) {
-        this.repos.push(repo)
+      if (!this.repos.includes(bug.repo)) {
+        this.repos.push(bug.repo)
       }
     }
-    // const bugDates = this.getBugs().map(issue => +new Date(issue.created_at))
-    const releaseDates = this.releases.map(function (release) {
-      return {published: +new Date(release.published_at), url: release.url}
+    const releaseDates = this.releases.map(release => {
+      return {published: release.publishedAt, repo: release.repo}
     })
     for (const repo of this.repos) {
-      releaseDates.push({published: Date.now(), url: repo})
+      releaseDates.push({published: Date.now(), repo})
     }
 
     let failedDeploys = 0
     for (const repo of this.repos) {
-      const releasesForRepo = releaseDates.filter(r => r.url.includes(repo))
+      const releasesForRepo = releaseDates.filter(r => r.repo === repo)
       for (let i = 0; i < releasesForRepo.length - 1; i++) {
         if (
-          bugs.filter(function (bug) {
-            if (bug.repository_url.split('/').reverse()[0] !== repo) {
-              return false
-            }
-            const bugDate = +new Date(bug.created_at)
-            return (
-              bugDate > releasesForRepo[i].published &&
-              bugDate < releasesForRepo[i + 1].published
-            )
-          }).length > 0
+          bugs.filter(
+            bug =>
+              bug.repo === repo &&
+              bug.createdAt > releasesForRepo[i].published &&
+              bug.createdAt < releasesForRepo[i + 1].published
+          ).length > 0
         ) {
           failedDeploys += 1
         }

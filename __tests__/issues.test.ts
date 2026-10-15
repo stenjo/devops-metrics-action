@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import {IssuesAdapter} from '../src/IssuesAdapter'
 import {GitHubClient} from '../src/GitHubClient'
-import type {Issue} from '../src/types/Issue'
+import type {GitHubIssuePayload} from '../src/github/payloads'
 import * as dotenv from 'dotenv'
 
 dotenv.config()
@@ -20,20 +20,26 @@ describe.skipIf(!process.env.GH_TOKEN)('Real Issues API should', () => {
 })
 
 describe('mocked Issues API should', () => {
-  test('return issues', async () => {
+  test('return issues mapped to the domain type', async () => {
     const issueAdapter = new IssuesAdapter(new GitHubClient(), 'stenjo', [
-      'dora'
+      'devops-metrics-action'
     ])
     mockedGetIssuesReturns('./__tests__/test-data/issue-list.json')
 
     const il = await issueAdapter.GetAllIssuesLastMonth()
     expect(il?.length).toBe(30)
+    expect(il?.[0]).toEqual({
+      repo: 'stenjo/devops-metrics-action',
+      createdAt: +new Date('2023-04-30T17:28:48Z'),
+      closedAt: +new Date('2023-04-30T17:29:33Z'),
+      labels: ['autorelease: tagged']
+    })
   })
 })
 
 function mockedGetIssuesReturns(file: string): void {
   vi.spyOn(GitHubClient.prototype, 'paginate').mockImplementation(
-    async (): Promise<Issue[]> =>
-      JSON.parse(fs.readFileSync(file).toString()) as Issue[]
+    async (): Promise<GitHubIssuePayload[]> =>
+      JSON.parse(fs.readFileSync(file).toString()) as GitHubIssuePayload[]
   )
 }

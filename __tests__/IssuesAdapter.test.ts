@@ -3,7 +3,9 @@ import {setupServer} from 'msw/node'
 import {setFailed} from '@actions/core'
 import {IssuesAdapter} from '../src/IssuesAdapter'
 import {GitHubClient} from '../src/GitHubClient'
-import {Issue} from '../src/types/Issue'
+import type {Issue} from '../src/types/Issue'
+import type {GitHubIssuePayload} from '../src/github/payloads'
+import {issuePayload} from './helpers/payloads'
 
 const server = setupServer(
   http.get(
@@ -12,9 +14,9 @@ const server = setupServer(
     ({request, params, cookies}) => {
       const url = new URL(request.url)
       const page = url.searchParams.getAll('page')
-      const issues: Issue[] = []
+      const issues: GitHubIssuePayload[] = []
       for (let i = 0; i < (+page < 2 ? 100 : 50); i++) {
-        issues.push({id: i} as Issue)
+        issues.push(issuePayload({id: i}))
       }
       return HttpResponse.json(issues)
     }
@@ -86,7 +88,7 @@ describe('Issue Adapter should', () => {
         ({request}) => {
           pages.push(new URL(request.url).searchParams.get('page') as string)
           return HttpResponse.json(
-            Array.from({length: 100}, (_, i) => ({id: i}))
+            Array.from({length: 100}, (_, i) => issuePayload({id: i}))
           )
         }
       )

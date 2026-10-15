@@ -1,15 +1,11 @@
-import {Issue} from './types/Issue'
-import {Release} from './types/Release'
+import type {Issue} from './types/Issue'
+import type {Release} from './types/Release'
+import type {RepoKey} from './types/RepoKey'
 
 export interface BugTime {
   start: number
   end: number
-  repo: string
-}
-
-export interface ReleaseDate {
-  published: number
-  url: string
+  repo: RepoKey
 }
 
 const ONE_DAY = 1000 * 60 * 60 * 24
@@ -17,8 +13,7 @@ const ONE_DAY = 1000 * 60 * 60 * 24
 export class MeanTimeToRestore {
   today: Date
   issues: Issue[]
-  releases: Release[]
-  releaseDates: ReleaseDate[] // array of object with unix time and repo url
+  releases: Release[] // Sorted ascending by publishedAt
   bugLabel: string
 
   constructor(
@@ -33,16 +28,11 @@ export class MeanTimeToRestore {
       this.today = today
     }
     this.issues = issues
-    this.releases = releases
     this.bugLabel = bugLabel
-    if (this.releases === null || this.releases.length === 0) {
+    if (releases === null || releases.length === 0) {
       throw new Error('Empty release list')
     }
-    this.releaseDates = this.releases
-      .map(function (r) {
-        return {published: +new Date(r.published_at), url: r.url}
-      })
-      .sort((a, b) => a.published - b.published) // Sort ascending
+    this.releases = [...releases].sort((a, b) => a.publishedAt - b.publishedAt)
   }
 
   getBugCount(): BugTime[] {
@@ -55,18 +45,15 @@ export class MeanTimeToRestore {
   private getStartAndEndTimesForBugs(bugs: Issue[]): BugTime[] {
     const values: BugTime[] = []
     for (const bug of bugs) {
-      const createdAt = +new Date(bug.created_at)
-      const closedAt = +new Date(bug.closed_at as string)
-      const repoName = bug.repository_url.split('/').reverse()[0]
       if (
-        bug.closed_at != null &&
-        this.hasLaterRelease(closedAt, repoName) &&
-        this.hasPreviousRelease(createdAt, repoName)
+        bug.closedAt !== null &&
+        this.hasLaterRelease(bug.closedAt, bug.repo) &&
+        this.hasPreviousRelease(bug.createdAt, bug.repo)
       ) {
         values.push({
-          start: createdAt,
-          end: closedAt,
-          repo: repoName
+          start: bug.createdAt,
+          end: bug.closedAt,
+          repo: bug.repo
         })
       }
     }
@@ -76,10 +63,9 @@ export class MeanTimeToRestore {
   private getIssuesTaggedAsBug(): Issue[] {
     const bugs: Issue[] = []
     for (const issue of this.issues) {
-      const createdAt = +new Date(issue.created_at)
       if (
-        issue.labels.filter(label => label.name === this.bugLabel).length > 0 &&
-        createdAt > this.today.getTime() - 30 * ONE_DAY
+        issue.labels.includes(this.bugLabel) &&
+        issue.createdAt > this.today.getTime() - 30 * ONE_DAY
       ) {
         bugs.push(issue)
       }
@@ -87,49 +73,43 @@ export class MeanTimeToRestore {
     return bugs
   }
 
-  hasPreviousRelease(date: number, repo: string): boolean {
-    return (
-      this.releaseDates.filter(r => r.published < date && r.url.includes(repo))
-        .length > 0
-    )
+  hasPreviousRelease(date: number, repo: RepoKey): boolean {
+    return this.releases.some(r => r.publishedAt < date && r.repo === repo)
   }
 
-  getReleaseBefore(date: number, repo: string): ReleaseDate {
-    const rdates: ReleaseDate[] = this.releaseDates.filter(
-      r => r.published < date && r.url.includes(repo)
+  getReleaseBefore(date: number, repo: RepoKey): Release {
+    const releases = this.releases.filter(
+      r => r.publishedAt < date && r.repo === repo
     )
 
-    if (rdates.length === 0) {
+    if (releases.length === 0) {
       throw new Error('No previous releases')
     }
 
-    return rdates.pop() as ReleaseDate
+    return releases.pop() as Release
   }
 
-  getReleaseAfter(date: number, repo: string): ReleaseDate {
-    const rdates: ReleaseDate[] = this.releaseDates.filter(
-      r => r.published > date && r.url.includes(repo)
+  getReleaseAfter(date: number, repo: RepoKey): Release {
+    const releases = this.releases.filter(
+      r => r.publishedAt > date && r.repo === repo
     )
 
-    if (rdates.length === 0) {
+    if (releases.length === 0) {
       throw new Error('No later releases')
     }
 
-    return rdates.reverse().pop() as ReleaseDate
+    return releases[0]
   }
 
-  hasLaterRelease(date: number, repo: string): boolean {
-    return (
-      this.releaseDates.filter(r => r.published > date && r.url.includes(repo))
-        .length > 0
-    )
+  hasLaterRelease(date: number, repo: RepoKey): boolean {
+    return this.releases.some(r => r.publishedAt > date && r.repo === repo)
   }
 
   getRestoreTime(bug: BugTime): number {
     const prevRel = this.getReleaseBefore(bug.start, bug.repo)
     const nextRel = this.getReleaseAfter(bug.end, bug.repo)
 
-    return nextRel.published - prevRel.published
+    return nextRel.publishedAt - prevRel.publishedAt
   }
 
   mttr(): number {
