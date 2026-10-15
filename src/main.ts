@@ -1,0 +1,137 @@
+import type * as core from '@actions/core'
+import type {GitHubClient} from './GitHubClient'
+import {ReleaseAdapter} from './ReleaseAdapter'
+import {DeployFrequency} from './DeployFrequency'
+import {ChangeFailureRate} from './ChangeFailureRate'
+import {IssuesAdapter} from './IssuesAdapter'
+import {MeanTimeToRestore} from './MeanTimeToRestore'
+import {PullRequestsAdapter} from './PullRequestsAdapter'
+import {CommitsAdapter} from './CommitsAdapter'
+import {LeadTime} from './LeadTime'
+import type {Release} from './types/Release'
+import type {PullRequest} from './types/PullRequest'
+
+export interface Inputs {
+  owner: string
+  repositories: string[]
+  token: string | undefined
+  logging: boolean
+  filtered: boolean
+  bugLabel: string
+}
+
+export interface Outputs {
+  'deploy-rate': string
+  'deploy-rate-log'?: string
+  'lead-time': number
+  'lead-time-log'?: string
+  'change-failure-rate': number | string
+  mttr: number | string
+}
+
+export type ActionsCore = Pick<typeof core, 'getInput' | 'info' | 'setOutput'>
+
+export interface RepoContext {
+  owner: string
+  repo: string
+}
+
+// `github.context.repo` is a getter that throws outside Actions, so it must stay lazy.
+export interface ActionsContext {
+  readonly repo: RepoContext
+}
+
+export interface RunDeps {
+  inputs: Inputs
+  client: GitHubClient
+  core: Pick<ActionsCore, 'info' | 'setOutput'>
+}
+
+export function parseInputs(
+  core: Pick<ActionsCore, 'getInput' | 'info'>,
+  context: ActionsContext,
+  env: NodeJS.ProcessEnv
+): Inputs {
+  let repo: string = core.getInput('repo')
+  if (repo === '' || repo === null) {
+    repo = context.repo.repo
+    core.info(`${context.repo.repo} - default repo.`)
+  }
+
+  // Allow for multiple repos, ex: [val1, val2, val3]
+  const repositories = repo
+    .split(/[[\]\n,]+/)
+    .map(s => s.trim())
+    .filter(x => x !== '')
+
+  let owner: string = core.getInput('owner')
+  if (owner === '' || owner === null) {
+    owner = context.repo.owner
+    core.info(`${context.repo.owner} - default owner.`)
+  }
+
+  for (const repository of repositories) {
+    core.info(`${owner}/${repository}`)
+  }
+
+  const repoCount = repositories.length
+  if (repoCount > 1) {
+    core.info(`${repoCount.toString()} repositories registered.`)
+  } else {
+    core.info(`${repoCount.toString()} repository registered.`)
+  }
+
+  let token: string | undefined = core.getInput('token')
+  if (token === '' || token === null) {
+    token = env.GH_TOKEN
+  }
+
+  return {
+    owner,
+    repositories,
+    token,
+    logging: core.getInput('logging') === 'true',
+    filtered: core.getInput('filtered') === 'true',
+    bugLabel: core.getInput('bug-label') || 'bug'
+  }
+}
+
+export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
+  const {owner, repositories, logging, filtered, bugLabel} = inputs
+  const outputs: Partial<Outputs> = {}
+  const emit = <K extends keyof Outputs>(name: K, value: Outputs[K]): void => {
+    outputs[name] = value
+    core.setOutput(name, value)
+  }
+
+  const rel = new ReleaseAdapter(client, owner, repositories)
+  const releaseList = (await rel.GetAllReleasesLastMonth()) as Release[]
+  const df = new DeployFrequency(releaseList)
+  emit('deploy-rate', df.rate())
+  if (logging) {
+    emit('deploy-rate-log', df.getLog().join('\n'))
+  }
+
+  const prs = new PullRequestsAdapter(client, owner, repositories)
+  const commits = new CommitsAdapter(client)
+  const pulls = (await prs.GetAllPRsLastMonth()) as PullRequest[]
+  const lt = new LeadTime(pulls, releaseList, commits)
+  emit('lead-time', await lt.getLeadTime(filtered))
+  if (logging) {
+    emit('lead-time-log', lt.getLog().join('\n'))
+  }
+
+  const issueAdapter = new IssuesAdapter(client, owner, repositories)
+  const issueList = await issueAdapter.GetAllIssuesLastMonth()
+  if (issueList) {
+    const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel)
+    emit('change-failure-rate', cfr.Cfr())
+    const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel)
+    emit('mttr', mttr.mttr())
+  } else {
+    emit('change-failure-rate', 'empty issue list')
+    emit('mttr', 'empty issue list')
+  }
+
+  return outputs as Outputs
+}
