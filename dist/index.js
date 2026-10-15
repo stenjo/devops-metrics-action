@@ -29288,7 +29288,7 @@ __nccwpck_require__.d(core_namespaceObject, {
   addPath: () => (addPath),
   debug: () => (debug),
   endGroup: () => (endGroup),
-  error: () => (error),
+  error: () => (core_error),
   exportVariable: () => (exportVariable),
   getBooleanInput: () => (getBooleanInput),
   getIDToken: () => (getIDToken),
@@ -32127,7 +32127,7 @@ function setCommandEcho(enabled) {
  */
 function setFailed(message) {
     process.exitCode = ExitCode.Failure;
-    error(message);
+    core_error(message);
 }
 //-----------------------------------------------------------------------
 // Logging Commands
@@ -32150,7 +32150,7 @@ function debug(message) {
  * @param message error issue message. Errors will be converted to string via toString()
  * @param properties optional properties to add to the annotation.
  */
-function error(message, properties = {}) {
+function core_error(message, properties = {}) {
     issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
@@ -37263,6 +37263,22 @@ function getOctokit(token, options, ...additionalPlugins) {
 //# sourceMappingURL=github.js.map
 ;// CONCATENATED MODULE: ./src/GitHubClient.ts
 
+// Stable, URL/body-free failure message; the raw Octokit error is kept as `cause`.
+class GitHubApiError extends Error {
+    status;
+    route;
+    constructor(route, cause) {
+        const status = typeof cause?.status === 'number'
+            ? cause.status
+            : undefined;
+        super(`GitHub API request failed (${status ?? 'unknown'}) for ${route}`, {
+            cause
+        });
+        this.name = 'GitHubApiError';
+        this.status = status;
+        this.route = route;
+    }
+}
 class GitHubClient {
     octokit;
     constructor(options = {}) {
@@ -37272,11 +37288,16 @@ class GitHubClient {
         });
     }
     async request(route, params = {}) {
-        const result = await this.octokit.request(route, {
-            ...params,
-            headers: { 'X-GitHub-Api-Version': '2022-11-28' }
-        });
-        return result.data;
+        try {
+            const result = await this.octokit.request(route, {
+                ...params,
+                headers: { 'X-GitHub-Api-Version': '2022-11-28' }
+            });
+            return result.data;
+        }
+        catch (e) {
+            throw new GitHubApiError(route, e);
+        }
     }
     async paginate(route, params = {}, options = {}) {
         const perPage = 100;
@@ -37341,7 +37362,6 @@ function toCommit(payload) {
 
 ;// CONCATENATED MODULE: ./src/ReleaseAdapter.ts
 
-
 class ReleaseAdapter {
     client;
     owner;
@@ -37355,18 +37375,12 @@ class ReleaseAdapter {
     }
     async GetAllReleasesLastMonth() {
         const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
-        try {
-            let result = [];
-            for (const repo of this.repositories) {
-                const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
-                result = result.concat(payloads.map(payload => toRelease(this.owner, repo, payload)));
-            }
-            return result;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let result = [];
+        for (const repo of this.repositories) {
+            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+            result = result.concat(payloads.map(payload => toRelease(this.owner, repo, payload)));
         }
-        catch (e) {
-            setFailed(e.message);
-        }
+        return result;
     }
 }
 
@@ -37487,8 +37501,6 @@ class ChangeFailureRate {
 }
 
 ;// CONCATENATED MODULE: ./src/IssuesAdapter.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 
 class IssuesAdapter {
     client;
@@ -37503,17 +37515,12 @@ class IssuesAdapter {
     }
     async GetAllIssuesLastMonth() {
         const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
-        try {
-            let result = [];
-            for (const repo of this.repositories) {
-                const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/issues?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
-                result = result.concat(payloads.map(payload => toIssue(this.owner, repo, payload)));
-            }
-            return result;
+        let result = [];
+        for (const repo of this.repositories) {
+            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/issues?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+            result = result.concat(payloads.map(payload => toIssue(this.owner, repo, payload)));
         }
-        catch (e) {
-            setFailed(e.message);
-        }
+        return result;
     }
 }
 
@@ -37609,8 +37616,6 @@ class MeanTimeToRestore {
 }
 
 ;// CONCATENATED MODULE: ./src/PullRequestsAdapter.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 
 class PullRequestsAdapter {
     client;
@@ -37625,23 +37630,16 @@ class PullRequestsAdapter {
     }
     async GetAllPRsLastMonth() {
         const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
-        try {
-            let result = [];
-            for (const repo of this.repositories) {
-                const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
-                result = result.concat(payloads.map(payload => toPullRequest(this.owner, repo, payload)));
-            }
-            return result;
+        let result = [];
+        for (const repo of this.repositories) {
+            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+            result = result.concat(payloads.map(payload => toPullRequest(this.owner, repo, payload)));
         }
-        catch (e) {
-            setFailed(e.message);
-        }
+        return result;
     }
 }
 
 ;// CONCATENATED MODULE: ./src/CommitsAdapter.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 
 class CommitsAdapter {
     client;
@@ -37649,13 +37647,8 @@ class CommitsAdapter {
         this.client = client;
     }
     async getCommitsFromUrl(url) {
-        try {
-            const payloads = await this.client.request(url);
-            return payloads.map(toCommit);
-        }
-        catch (e) {
-            setFailed(e.message);
-        }
+        const payloads = await this.client.request(url);
+        return payloads.map(toCommit);
     }
 }
 
@@ -37705,7 +37698,7 @@ class LeadTime {
             }
             const deployTime = laterReleases[0].publishedAt;
             this.log.push(`pull->      ${isoTimestamp(pull.mergedAt)} : ${pull.title}`);
-            const commits = (await this.commitsAdapter.getCommitsFromUrl(pull.commitsUrl));
+            const commits = await this.commitsAdapter.getCommitsFromUrl(pull.commitsUrl);
             const firstCommit = commits.sort((a, b) => a.committedAt - b.committedAt)[0];
             this.log.push(`  commit->  ${isoTimestamp(firstCommit.committedAt)} : ${firstCommit.message}`);
             this.log.push(`  release-> ${isoTimestamp(laterReleases[0].publishedAt)} : ${laterReleases[0].name}`);
@@ -37777,37 +37770,25 @@ function parseInputs(core, context, env) {
 }
 async function run({ inputs, client, core }) {
     const { owner, repositories, logging, filtered, bugLabel } = inputs;
-    const outputs = {};
-    const emit = (name, value) => {
-        outputs[name] = value;
-        core.setOutput(name, value);
-    };
-    const rel = new ReleaseAdapter(client, owner, repositories);
-    const releaseList = (await rel.GetAllReleasesLastMonth());
+    // Fetch everything first so an API failure aborts before any output is set.
+    const releaseList = await new ReleaseAdapter(client, owner, repositories).GetAllReleasesLastMonth();
+    const pulls = await new PullRequestsAdapter(client, owner, repositories).GetAllPRsLastMonth();
+    const issueList = await new IssuesAdapter(client, owner, repositories).GetAllIssuesLastMonth();
     const df = new DeployFrequency(releaseList);
-    emit('deploy-rate', df.rate());
-    if (logging) {
-        emit('deploy-rate-log', df.getLog().join('\n'));
-    }
-    const prs = new PullRequestsAdapter(client, owner, repositories);
-    const commits = new CommitsAdapter(client);
-    const pulls = (await prs.GetAllPRsLastMonth());
-    const lt = new LeadTime(pulls, releaseList, commits);
-    emit('lead-time', await lt.getLeadTime(filtered));
-    if (logging) {
-        emit('lead-time-log', lt.getLog().join('\n'));
-    }
-    const issueAdapter = new IssuesAdapter(client, owner, repositories);
-    const issueList = await issueAdapter.GetAllIssuesLastMonth();
-    if (issueList) {
-        const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel);
-        emit('change-failure-rate', cfr.Cfr());
-        const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel);
-        emit('mttr', mttr.mttr());
-    }
-    else {
-        emit('change-failure-rate', 'empty issue list');
-        emit('mttr', 'empty issue list');
+    const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client));
+    const leadTime = await lt.getLeadTime(filtered);
+    const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel);
+    const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel);
+    const outputs = {
+        'deploy-rate': df.rate(),
+        ...(logging && { 'deploy-rate-log': df.getLog().join('\n') }),
+        'lead-time': leadTime,
+        ...(logging && { 'lead-time-log': lt.getLog().join('\n') }),
+        'change-failure-rate': cfr.Cfr(),
+        mttr: mttr.mttr()
+    };
+    for (const [name, value] of Object.entries(outputs)) {
+        core.setOutput(name, value);
     }
     return outputs;
 }
@@ -37824,6 +37805,10 @@ async function bootstrap() {
         await run({ inputs, client: new GitHubClient({ token: inputs.token }), core: core_namespaceObject });
     }
     catch (error) {
+        // The raw API error goes to the log only; the failure message stays stable.
+        if (error instanceof GitHubApiError && error.cause instanceof Error) {
+            core_error(error.cause.message);
+        }
         setFailed(error instanceof Error ? error.message : String(error));
     }
 }

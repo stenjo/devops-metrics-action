@@ -1,8 +1,7 @@
 import {http, HttpResponse} from 'msw'
 import {setupServer} from 'msw/node'
-import {setFailed} from '@actions/core'
 import {ReleaseAdapter} from '../src/ReleaseAdapter'
-import {GitHubClient} from '../src/GitHubClient'
+import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
 import type {Release} from '../src/types/Release'
 import type {
   GitHubPersonPayload,
@@ -61,9 +60,6 @@ const server = setupServer(
     }
   )
 )
-vi.mock('@actions/core', () => ({
-  setFailed: vi.fn()
-}))
 
 describe('Release Adapter should', () => {
   beforeAll(() => server.listen())
@@ -83,7 +79,7 @@ describe('Release Adapter should', () => {
   it('return paged values mapped to the domain type', async () => {
     const r = new ReleaseAdapter(new GitHubClient(), 'Test-Owner', ['Project1'])
 
-    const releases: Release[] = (await r.GetAllReleasesLastMonth()) as Release[]
+    const releases: Release[] = await r.GetAllReleasesLastMonth()
 
     expect(releases.length).toBe(150)
     expect(releases[1]).toEqual({
@@ -106,7 +102,7 @@ describe('Release Adapter should', () => {
       'api-gateway'
     ])
 
-    const releases = (await r.GetAllReleasesLastMonth()) as Release[]
+    const releases = await r.GetAllReleasesLastMonth()
 
     expect(releases.map(x => [x.repo, x.name])).toEqual([
       ['o/api', 'api'],
@@ -160,7 +156,7 @@ describe('Release Adapter should', () => {
     )
     const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
 
-    const releases = (await r.GetAllReleasesLastMonth()) as Release[]
+    const releases = await r.GetAllReleasesLastMonth()
 
     expect(pages.length).toBe(99)
     expect(pages[0]).toBe('1')
@@ -169,23 +165,22 @@ describe('Release Adapter should', () => {
     expect(releases.length).toBe(9900)
   })
 
-  it('handles access denied', async () => {
-    server.close()
-    const errorServer = setupServer(
+  it('throw a GitHubApiError on access denied', async () => {
+    server.use(
       http.get(
         'https://api.github.com/repos/:owner/:rep/releases',
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({request, params, cookies}) => {
-          return new HttpResponse('access denied', {status: 401})
-        }
+        () => new HttpResponse('access denied', {status: 401})
       )
     )
-    errorServer.listen()
     const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
-    const result = await r.GetAllReleasesLastMonth()
 
-    expect(result).toBe(undefined)
-    expect(setFailed).toHaveBeenCalledWith('access denied')
-    errorServer.close()
+    const error = await r.GetAllReleasesLastMonth().catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(GitHubApiError)
+    expect(error).toMatchObject({
+      message:
+        'GitHub API request failed (401) for GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}',
+      status: 401
+    })
   })
 })

@@ -8,8 +8,6 @@ import {MeanTimeToRestore} from './MeanTimeToRestore'
 import {PullRequestsAdapter} from './PullRequestsAdapter'
 import {CommitsAdapter} from './CommitsAdapter'
 import {LeadTime} from './LeadTime'
-import type {Release} from './types/Release'
-import type {PullRequest} from './types/PullRequest'
 
 export interface Inputs {
   owner: string
@@ -25,8 +23,8 @@ export interface Outputs {
   'deploy-rate-log'?: string
   'lead-time': number
   'lead-time-log'?: string
-  'change-failure-rate': number | string
-  mttr: number | string
+  'change-failure-rate': number
+  mttr: number
 }
 
 export type ActionsCore = Pick<
@@ -109,40 +107,41 @@ export function parseInputs(
 
 export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
   const {owner, repositories, logging, filtered, bugLabel} = inputs
-  const outputs: Partial<Outputs> = {}
-  const emit = <K extends keyof Outputs>(name: K, value: Outputs[K]): void => {
-    outputs[name] = value
+
+  // Fetch everything first so an API failure aborts before any output is set.
+  const releaseList = await new ReleaseAdapter(
+    client,
+    owner,
+    repositories
+  ).GetAllReleasesLastMonth()
+  const pulls = await new PullRequestsAdapter(
+    client,
+    owner,
+    repositories
+  ).GetAllPRsLastMonth()
+  const issueList = await new IssuesAdapter(
+    client,
+    owner,
+    repositories
+  ).GetAllIssuesLastMonth()
+
+  const df = new DeployFrequency(releaseList)
+  const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client))
+  const leadTime = await lt.getLeadTime(filtered)
+  const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel)
+  const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel)
+
+  const outputs: Outputs = {
+    'deploy-rate': df.rate(),
+    ...(logging && {'deploy-rate-log': df.getLog().join('\n')}),
+    'lead-time': leadTime,
+    ...(logging && {'lead-time-log': lt.getLog().join('\n')}),
+    'change-failure-rate': cfr.Cfr(),
+    mttr: mttr.mttr()
+  }
+  for (const [name, value] of Object.entries(outputs)) {
     core.setOutput(name, value)
   }
 
-  const rel = new ReleaseAdapter(client, owner, repositories)
-  const releaseList = (await rel.GetAllReleasesLastMonth()) as Release[]
-  const df = new DeployFrequency(releaseList)
-  emit('deploy-rate', df.rate())
-  if (logging) {
-    emit('deploy-rate-log', df.getLog().join('\n'))
-  }
-
-  const prs = new PullRequestsAdapter(client, owner, repositories)
-  const commits = new CommitsAdapter(client)
-  const pulls = (await prs.GetAllPRsLastMonth()) as PullRequest[]
-  const lt = new LeadTime(pulls, releaseList, commits)
-  emit('lead-time', await lt.getLeadTime(filtered))
-  if (logging) {
-    emit('lead-time-log', lt.getLog().join('\n'))
-  }
-
-  const issueAdapter = new IssuesAdapter(client, owner, repositories)
-  const issueList = await issueAdapter.GetAllIssuesLastMonth()
-  if (issueList) {
-    const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel)
-    emit('change-failure-rate', cfr.Cfr())
-    const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel)
-    emit('mttr', mttr.mttr())
-  } else {
-    emit('change-failure-rate', 'empty issue list')
-    emit('mttr', 'empty issue list')
-  }
-
-  return outputs as Outputs
+  return outputs
 }

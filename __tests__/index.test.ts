@@ -1,12 +1,16 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import {GitHubClient} from '../src/GitHubClient'
+import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
 import {parseInputs, run} from '../src/main'
 import type {Inputs} from '../src/main'
 
 vi.mock('@actions/core')
 vi.mock('@actions/github')
-vi.mock('../src/GitHubClient')
+// Only the client is mocked; GitHubApiError must stay real for instanceof in index.ts.
+vi.mock('../src/GitHubClient', async importOriginal => ({
+  ...(await importOriginal<typeof import('../src/GitHubClient')>()),
+  GitHubClient: vi.fn()
+}))
 vi.mock('../src/main')
 
 const inputs: Inputs = {
@@ -51,6 +55,33 @@ describe('index.ts bootstrap', () => {
     await importIndex()
 
     expect(core.setFailed).toHaveBeenCalledWith('Failed to fetch releases')
+    expect(core.error).not.toHaveBeenCalled()
+  })
+
+  it('sets the stable GitHubApiError message and logs the raw cause separately', async () => {
+    const cause = Object.assign(new Error('Forbidden: https://x/y {body}'), {
+      status: 403
+    })
+    vi.mocked(run).mockRejectedValueOnce(new GitHubApiError('GET /x', cause))
+
+    await importIndex()
+
+    expect(core.error).toHaveBeenCalledWith('Forbidden: https://x/y {body}')
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'GitHub API request failed (403) for GET /x'
+    )
+    expect(core.setFailed).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not log a cause that is not an Error', async () => {
+    vi.mocked(run).mockRejectedValueOnce(new GitHubApiError('GET /x', 'boom'))
+
+    await importIndex()
+
+    expect(core.error).not.toHaveBeenCalled()
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'GitHub API request failed (unknown) for GET /x'
+    )
   })
 
   it('stringifies non-Error rejections', async () => {

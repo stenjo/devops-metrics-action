@@ -1,6 +1,5 @@
 import {CommitsAdapter} from '../src/CommitsAdapter'
 import {GitHubClient} from '../src/GitHubClient'
-import type {Commit} from '../src/types/Commit'
 import type {GitHubCommitPayload} from '../src/github/payloads'
 import fs from 'node:fs'
 import * as dotenv from 'dotenv'
@@ -17,7 +16,7 @@ test('fetches commits', async () => {
       ) as GitHubCommitPayload[]
   )
 
-  const cl = (await adapter.getCommitsFromUrl('10')) as Commit[]
+  const cl = await adapter.getCommitsFromUrl('10')
 
   expect(cl.length).toBeGreaterThan(-1)
   expect(cl.length).toBe(30)
@@ -31,5 +30,5 @@ test('CommitsAdapter should', async () => {
   )
 
   expect(result).not.toBe(undefined)
-  expect((result as Commit[]).length).toBeGreaterThan(7)
+  expect(result.length).toBeGreaterThan(7)
 })

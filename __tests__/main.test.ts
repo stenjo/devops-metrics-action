@@ -372,34 +372,60 @@ describe('run', () => {
 
   it('reports an empty issue list instead of computing change-failure-rate and mttr', async () => {
     ;(IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock).mockResolvedValue(
-      undefined
+      []
     )
     const fake = fakeCore({})
 
-    const outputs = await run({inputs: inputsWith(), client, core: fake})
+    await run({inputs: inputsWith(), client, core: fake})
 
-    expect(outputs['change-failure-rate']).toBe('empty issue list')
-    expect(outputs.mttr).toBe('empty issue list')
-    expect(fake.setOutput).toHaveBeenCalledWith(
-      'change-failure-rate',
-      'empty issue list'
+    expect(ChangeFailureRate).toHaveBeenCalledWith(
+      [],
+      mockReleases,
+      null,
+      'bug'
     )
-    expect(fake.setOutput).toHaveBeenCalledWith('mttr', 'empty issue list')
-    expect(ChangeFailureRate).not.toHaveBeenCalled()
-    expect(MeanTimeToRestore).not.toHaveBeenCalled()
+    expect(MeanTimeToRestore).toHaveBeenCalledWith(
+      [],
+      mockReleases,
+      null,
+      'bug'
+    )
   })
 
-  it('propagates adapter errors to the caller', async () => {
-    ;(
-      ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
-    ).mockRejectedValueOnce(new Error('Failed to fetch releases'))
-    const fake = fakeCore({})
+  /* eslint-disable @typescript-eslint/unbound-method */
+  it.each([
+    ['releases', () => ReleaseAdapter.prototype.GetAllReleasesLastMonth],
+    ['pulls', () => PullRequestsAdapter.prototype.GetAllPRsLastMonth],
+    ['issues', () => IssuesAdapter.prototype.GetAllIssuesLastMonth],
+    ['commits (via lead time)', () => LeadTime.prototype.getLeadTime]
+  ])(
+    'aborts before any output is set when fetching %s fails',
+    async (_name, method) => {
+      ;(method() as Mock).mockRejectedValueOnce(new Error('Failed to fetch'))
+      const fake = fakeCore({})
 
-    await expect(
-      run({inputs: inputsWith(), client, core: fake})
-    ).rejects.toThrow('Failed to fetch releases')
-    expect(fake.setOutput).not.toHaveBeenCalled()
+      await expect(
+        run({inputs: inputsWith(), client, core: fake})
+      ).rejects.toThrow('Failed to fetch')
+      expect(fake.setOutput).not.toHaveBeenCalled()
+    }
+  )
+
+  it('fetches releases, pulls and issues before computing any metric', async () => {
+    await run({inputs: inputsWith(), client, core: fakeCore({})})
+
+    const order = (m: Mock): number => m.mock.invocationCallOrder[0]
+    const lastFetch = Math.max(
+      order(ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock),
+      order(PullRequestsAdapter.prototype.GetAllPRsLastMonth as Mock),
+      order(IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock)
+    )
+    expect(order(vi.mocked(DeployFrequency))).toBeGreaterThan(lastFetch)
+    expect(order(vi.mocked(LeadTime))).toBeGreaterThan(lastFetch)
+    expect(order(vi.mocked(ChangeFailureRate))).toBeGreaterThan(lastFetch)
+    expect(order(vi.mocked(MeanTimeToRestore))).toBeGreaterThan(lastFetch)
   })
+  /* eslint-enable @typescript-eslint/unbound-method */
 
   it.each([true, false])('passes filtered=%s to LeadTime', async filtered => {
     await run({inputs: inputsWith({filtered}), client, core: fakeCore({})})

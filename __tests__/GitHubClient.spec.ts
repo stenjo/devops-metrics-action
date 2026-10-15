@@ -1,4 +1,4 @@
-import {GitHubClient} from '../src/GitHubClient'
+import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
 import {Octokit} from '@octokit/core'
 
 vi.mock('@octokit/core')
@@ -70,11 +70,52 @@ describe('GitHubClient', () => {
       })
     })
 
-    it('propagates errors', async () => {
-      mockRequest.mockRejectedValue(new Error('boom'))
+    it('wraps errors in a GitHubApiError with a stable message, status, route and cause', async () => {
+      const cause = Object.assign(new Error('Forbidden: see https://x/y'), {
+        status: 403
+      })
+      mockRequest.mockRejectedValue(cause)
       const client = new GitHubClient()
 
-      await expect(client.request('GET /x')).rejects.toThrow('boom')
+      const error = await client.request('GET /x').catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(GitHubApiError)
+      expect(error).toMatchObject({
+        name: 'GitHubApiError',
+        message: 'GitHub API request failed (403) for GET /x',
+        status: 403,
+        route: 'GET /x',
+        cause
+      })
+    })
+
+    it('reports an unknown status when the error carries none', async () => {
+      mockRequest.mockRejectedValue(new Error('socket hang up'))
+      const client = new GitHubClient()
+
+      await expect(client.request('GET /x')).rejects.toMatchObject({
+        message: 'GitHub API request failed (unknown) for GET /x',
+        status: undefined
+      })
+    })
+
+    it('reports an unknown status when the status is not a number', async () => {
+      mockRequest.mockRejectedValue({status: '403'})
+      const client = new GitHubClient()
+
+      await expect(client.request('GET /x')).rejects.toMatchObject({
+        message: 'GitHub API request failed (unknown) for GET /x'
+      })
+    })
+
+    it('wraps non-object rejections too', async () => {
+      mockRequest.mockRejectedValue(undefined)
+      const client = new GitHubClient()
+
+      await expect(client.request('GET /x')).rejects.toMatchObject({
+        message: 'GitHub API request failed (unknown) for GET /x',
+        cause: undefined
+      })
     })
   })
 
@@ -213,10 +254,16 @@ describe('GitHubClient', () => {
     it('propagates errors from any page', async () => {
       mockRequest
         .mockResolvedValueOnce({data: page(100)})
-        .mockRejectedValueOnce(new Error('rate limited'))
+        .mockRejectedValueOnce(
+          Object.assign(new Error('rate limited'), {
+            status: 429
+          })
+        )
       const client = new GitHubClient()
 
-      await expect(client.paginate('GET /x')).rejects.toThrow('rate limited')
+      await expect(client.paginate('GET /x')).rejects.toThrow(
+        'GitHub API request failed (429) for GET /x'
+      )
     })
   })
 })
