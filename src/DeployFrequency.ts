@@ -1,17 +1,18 @@
 //
 
 import type {Release} from './types/Release'
+import type {ReleaseLogEntry} from './types/LogEntry'
 import {isoTimestamp} from './types/Timestamp'
 
 // The number of milliseconds in one day
 const ONE_DAY = 1000 * 60 * 60 * 24
 
 export class DeployFrequency {
-  log: string[] = []
+  log: ReleaseLogEntry[] = []
   today: Date = new Date()
   rList: Release[] = new Array<Release>()
 
-  getLog(): string[] {
+  getLog(): ReleaseLogEntry[] {
     return this.log
   }
 
@@ -31,9 +32,7 @@ export class DeployFrequency {
     for (const release of this.rList) {
       const relDate = new Date(release.publishedAt)
       if (this.days_between(this.today, relDate) < 8) {
-        this.log.push(
-          `release->  ${release.name}:${isoTimestamp(release.publishedAt)}`
-        )
+        this.log.push(this.entry(release))
         releaseCount++
       }
     }
@@ -46,9 +45,7 @@ export class DeployFrequency {
     for (const release of this.rList) {
       const relDate = new Date(release.publishedAt)
       if (this.days_between(this.today, relDate) < 31) {
-        this.log.push(
-          `release->  ${release.name}:${isoTimestamp(release.publishedAt)}`
-        )
+        this.log.push(this.entry(release))
         releaseCount++
       }
     }
@@ -58,6 +55,14 @@ export class DeployFrequency {
 
   rate(): string {
     return (Math.round(this.monthly() * 700) / 3000).toFixed(2)
+  }
+
+  private entry(release: Release): ReleaseLogEntry {
+    return {
+      kind: 'release',
+      at: isoTimestamp(release.publishedAt),
+      name: release.name
+    }
   }
 
   private days_between(date1: Date, date2: Date): number {

@@ -58,7 +58,9 @@ token: ${{ secrets.METRICS_PAT }}
 
 ### `logging`
 
-Set to true to make event logs of metrics source available.
+Set to true to make the `*-log` outputs available. Each log is a JSON array
+of the releases or pull requests behind the metric, see
+[Log outputs](#log-outputs).
 
 ### `filtered`
 
@@ -82,16 +84,17 @@ bug-label: incident
 Rate of deploys (tagged releases) per week. Decimal number. Elite performing
 teams has 7 as target (daily- or on-demand release)
 
-`deploy-frequency-log` - a list of releases forming the basis for the metric, if
-`logging` is enabled.
+`deploy-rate-log` - a JSON array of the releases forming the basis for the
+metric, if `logging` is enabled. See [Log outputs](#log-outputs).
 
 ### `lead-time`
 
 Time from issue is set to status doing until linked pull-requestis merged to
 main branch. Number in days (Integer)
 
-`lead-time-log` - a list of pull requests with matching first commit and re
-forming the basis for the metric, if `logging` is enabled.
+`lead-time-log` - a JSON array of the pull requests with matching first commit
+and release forming the basis for the metric, if `logging` is enabled. See
+[Log outputs](#log-outputs).
 
 ### `change-failure-rate`
 
@@ -108,6 +111,71 @@ and the first release after the issue is closed. For this to work correctly we
 must assume GitHub issues are created for all unwanted issues in production and
 that all changes to production is done through releases. Number in hours
 (integer)
+
+### Log outputs
+
+With `logging: true` the action also emits `deploy-rate-log` and
+`lead-time-log`. Both are **JSON array strings** meant to be parsed with
+`fromJSON` or `jq`, never echoed as free text. Records look like:
+
+```json
+[{"kind": "release", "at": "2026-10-01T12:00:00Z", "name": "v1.4.1"}]
+```
+
+```json
+[
+  {
+    "kind": "pull",
+    "at": "2026-09-30T09:12:00Z",
+    "title": "feat: add thing",
+    "commitAt": "2026-09-28T14:03:00Z",
+    "commitMessage": "feat: start thing",
+    "releaseAt": "2026-10-01T12:00:00Z",
+    "release": "v1.4.1",
+    "leadTimeDays": 2.91
+  }
+]
+```
+
+The logs are safe by construction:
+
+- Every string field (`title`, `commitMessage`, `name`, `release`) is
+  sanitized: control characters and newlines are removed, whitespace is
+  collapsed, backticks and `${` / `$(` openers are stripped, and the text is
+  truncated to 200 characters with a trailing `…`.
+- Each log is capped at 500 records and just under 1 MiB (GitHub's output
+  limit). When cut, the last record is `{"kind": "truncated", "omitted": n}`.
+
+Use `fromJSON` to work with the records in expressions, or `jq` in a script:
+
+```yaml
+- name: DevOps Metrics from GitHub
+  uses: stenjo/devops-metrics-action@v2
+  id: dora
+  with:
+    logging: true
+
+- name: Releases behind the deploy rate
+  env:
+    RELEASES: ${{ join(fromJSON(steps.dora.outputs.deploy-rate-log).*.name, ', ') }}
+  run: echo "Releases last month: $RELEASES"
+
+- name: Lead-time table
+  env:
+    LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
+  run: |
+    {
+      echo '| Merged | Pull request | Released | Days |'
+      echo '| --- | --- | --- | --- |'
+      jq -r '.[] | select(.kind == "pull")
+        | "| \(.at) | \(.title) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
+    } >> "$GITHUB_STEP_SUMMARY"
+```
+
+> [!NOTE]
+> **Migrating from v1:** the logs used to be newline-separated free text
+> (`pull->  <date> : <title>` lines). Any consumer that `grep`ped or split those
+> lines must switch to `fromJSON` / `jq` on the record fields above.
 
 ## Usage
 
@@ -145,13 +213,12 @@ output of the calculation step via variable format
 ```
 
 > [!WARNING]
-> Do **not** interpolate the `*-log` outputs (e.g.
-> `${{ steps.dora.outputs.lead-time-log }}`) directly into a `run:` script.
-> These logs contain arbitrary pull-request and commit body text, which the
-> shell will try to evaluate. A body containing a `${...}` sequence causes
-> bash to fail with `bad substitution` and the step exits with code 1.
-> Pass log outputs through the environment instead so their content is treated
-> literally:
+> Even though the `*-log` outputs are sanitized JSON, do **not** interpolate
+> them (e.g. `${{ steps.dora.outputs.lead-time-log }}`) directly into a `run:`
+> script. The content still originates from pull-request titles and commit
+> messages written by anyone who can contribute to the monitored repositories.
+> Pass log outputs through the environment so their content is treated
+> literally, and parse them with `fromJSON` or `jq`:
 >
 > ```yaml
 > - name: Get the lead time
@@ -160,7 +227,7 @@ output of the calculation step via variable format
 >     LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
 >   run: |
 >     echo "The lead time was $LEAD_TIME"
->     printf '%s\n' "$LEAD_TIME_LOG" > lead-time-log.txt
+>     jq -r '.[] | select(.kind == "pull") | .title' <<< "$LEAD_TIME_LOG"
 > ```
 
 More complex examples may be found in

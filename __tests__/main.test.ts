@@ -284,13 +284,21 @@ describe('run', () => {
     )
     ;(DeployFrequency.prototype.rate as Mock).mockReturnValue('5')
     ;(DeployFrequency.prototype.getLog as Mock).mockReturnValue([
-      'log1',
-      'log2'
+      {kind: 'release', at: '2023-04-22T20:28:29Z', name: 'v0.0.2'},
+      {kind: 'release', at: '2023-04-12T22:33:24Z', name: 'v0.0.1'}
     ])
     ;(LeadTime.prototype.getLeadTime as Mock).mockResolvedValue(10)
     ;(LeadTime.prototype.getLog as Mock).mockReturnValue([
-      'leadTimeLog1',
-      'leadTimeLog2'
+      {
+        kind: 'pull',
+        at: '2023-04-28T17:50:53Z',
+        title: 'feat: something',
+        commitAt: '2023-04-20T00:00:00Z',
+        commitMessage: 'first',
+        releaseAt: '2023-04-30T17:50:53Z',
+        release: 'v1.0.0',
+        leadTimeDays: 10.74
+      }
     ])
     ;(ChangeFailureRate.prototype.Cfr as Mock).mockReturnValue(0.1)
     ;(MeanTimeToRestore.prototype.mttr as Mock).mockReturnValue(3)
@@ -341,14 +349,21 @@ describe('run', () => {
 
     const expected = {
       'deploy-rate': '5',
-      'deploy-rate-log': 'log1\nlog2',
+      'deploy-rate-log':
+        '[{"kind":"release","at":"2023-04-22T20:28:29Z","name":"v0.0.2"},' +
+        '{"kind":"release","at":"2023-04-12T22:33:24Z","name":"v0.0.1"}]',
       'lead-time': 10,
-      'lead-time-log': 'leadTimeLog1\nleadTimeLog2',
+      'lead-time-log':
+        '[{"kind":"pull","at":"2023-04-28T17:50:53Z","title":"feat: something",' +
+        '"commitAt":"2023-04-20T00:00:00Z","commitMessage":"first",' +
+        '"releaseAt":"2023-04-30T17:50:53Z","release":"v1.0.0","leadTimeDays":10.74}]',
       'change-failure-rate': 0.1,
       mttr: 3
     }
     expect(outputs).toEqual(expected)
     expect(fake.setOutput.mock.calls).toEqual(Object.entries(expected))
+    expect(JSON.parse(outputs['deploy-rate-log'] as string)).toHaveLength(2)
+    expect(JSON.parse(outputs['lead-time-log'] as string)).toHaveLength(1)
   })
 
   it('does not set log outputs when logging is disabled', async () => {

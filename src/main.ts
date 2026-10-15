@@ -8,6 +8,7 @@ import {MeanTimeToRestore} from './MeanTimeToRestore'
 import {PullRequestsAdapter} from './PullRequestsAdapter'
 import {CommitsAdapter} from './CommitsAdapter'
 import {LeadTime} from './LeadTime'
+import {serializeLog} from './log'
 
 export interface Inputs {
   owner: string
@@ -133,9 +134,9 @@ export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
 
   const outputs: Outputs = {
     'deploy-rate': df.rate(),
-    ...(logging && {'deploy-rate-log': df.getLog().join('\n')}),
+    ...(logging && {'deploy-rate-log': serializeLog(df.getLog())}),
     'lead-time': leadTime,
-    ...(logging && {'lead-time-log': lt.getLog().join('\n')}),
+    ...(logging && {'lead-time-log': serializeLog(lt.getLog())}),
     'change-failure-rate': cfr.Cfr(),
     mttr: mttr.mttr()
   }

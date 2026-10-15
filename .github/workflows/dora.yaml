@@ -31,6 +31,7 @@ jobs:
         id: dora
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          logging: true
 
       # Use the output from the `dora` step
       - name: Get the output rate
@@ -51,6 +52,31 @@ jobs:
 
       - name: Install jq
         uses: dcarbone/install-jq-action@4fcb5062d7ce9bc4382d1a352d19ba3ba2c317c1 # v4.0.1
+
+      # The *-log outputs are JSON arrays (v2+); parse them, never echo them.
+      - name: Summarize metric logs
+        env:
+          DEPLOY_RATE_LOG: ${{ steps.dora.outputs.deploy-rate-log }}
+          LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
+        run: |
+          if ! jq -e 'type == "array"' <<< "$LEAD_TIME_LOG" > /dev/null 2>&1; then
+            echo "Log outputs are not JSON yet (action older than v2); skipping summary"
+            exit 0
+          fi
+          {
+            echo '## Releases behind the deploy rate'
+            echo
+            echo '| Published | Release |'
+            echo '| --- | --- |'
+            jq -r '.[] | select(.kind == "release") | "| \(.at) | \(.name) |"' <<< "$DEPLOY_RATE_LOG"
+            echo
+            echo '## Pull requests behind the lead time'
+            echo
+            echo '| Merged | Pull request | Released | Days |'
+            echo '| --- | --- | --- | --- |'
+            jq -r '.[] | select(.kind == "pull") | "| \(.at) | \(.title | gsub("\\|"; "\\|")) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
+            jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$LEAD_TIME_LOG"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Store Deploy Rate history
       - name: Load deploy rate history

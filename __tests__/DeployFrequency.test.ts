@@ -96,11 +96,7 @@ describe('Deploy frequency should', () => {
 
     df.weekly()
 
-    expect(
-      df.getLog().map(l => {
-        return l.includes('release')
-      }).length
-    ).toBe(5)
+    expect(df.getLog().filter(l => l.kind === 'release').length).toBe(5)
   })
 
   it('get release log list monthly when rate calculated', () => {
@@ -108,11 +104,7 @@ describe('Deploy frequency should', () => {
 
     df.monthly()
 
-    expect(
-      df.getLog().map(l => {
-        return l.includes('release')
-      }).length
-    ).toBe(6)
+    expect(df.getLog().filter(l => l.kind === 'release').length).toBe(6)
   })
 
   it('get release log list when rate calculated', () => {
@@ -120,11 +112,7 @@ describe('Deploy frequency should', () => {
 
     df.rate()
 
-    expect(
-      df.getLog().map(l => {
-        return l.includes('release')
-      }).length
-    ).toBe(6)
+    expect(df.getLog().filter(l => l.kind === 'release').length).toBe(6)
   })
 
   it('log release name and date weekly', () => {
@@ -132,7 +120,9 @@ describe('Deploy frequency should', () => {
 
     df.weekly()
 
-    expect(df.getLog()).toEqual(['release->  v0.0.2:2023-04-22T20:28:29Z'])
+    expect(df.getLog()).toEqual([
+      {kind: 'release', at: '2023-04-22T20:28:29Z', name: 'v0.0.2'}
+    ])
   })
 
   it('log release name and date monthly', () => {
@@ -141,8 +131,8 @@ describe('Deploy frequency should', () => {
     df.monthly()
 
     expect(df.getLog()).toEqual([
-      'release->  v0.0.2:2023-04-22T20:28:29Z',
-      'release->  v0.0.1:2023-04-12T22:33:24Z'
+      {kind: 'release', at: '2023-04-22T20:28:29Z', name: 'v0.0.2'},
+      {kind: 'release', at: '2023-04-12T22:33:24Z', name: 'v0.0.1'}
     ])
   })
 })
