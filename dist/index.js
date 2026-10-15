@@ -29207,6 +29207,36 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("util");
 /******/ /* webpack/runtime/asset-relocator-loader */
 /******/ if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = decodeURIComponent(new URL('.', import.meta.url).pathname).slice(import.meta.url.match(/^file:\/\/\/\w:/) ? 1 : 0, -1) + "/";
 /******/ 
+/******/ /* webpack/runtime/create fake namespace object */
+/******/ (() => {
+/******/ 	var getProto = Object.getPrototypeOf ? (obj) => (Object.getPrototypeOf(obj)) : (obj) => (obj.__proto__);
+/******/ 	var leafPrototypes;
+/******/ 	// create a fake namespace object
+/******/ 	// mode & 1: value is a module id, require it
+/******/ 	// mode & 2: merge all properties of value into the ns
+/******/ 	// mode & 4: return value when already ns object
+/******/ 	// mode & 16: return value when it's Promise-like
+/******/ 	// mode & 8|1: behave like require
+/******/ 	__nccwpck_require__.t = function(value, mode) {
+/******/ 		if(mode & 1) value = this(value);
+/******/ 		if(mode & 8) return value;
+/******/ 		if(typeof value === 'object' && value) {
+/******/ 			if((mode & 4) && value.__esModule) return value;
+/******/ 			if((mode & 16) && typeof value.then === 'function') return value;
+/******/ 		}
+/******/ 		var ns = Object.create(null);
+/******/ 		__nccwpck_require__.r(ns);
+/******/ 		var def = {};
+/******/ 		leafPrototypes = leafPrototypes || [null, getProto({}), getProto([]), getProto(getProto)];
+/******/ 		for(var current = mode & 2 && value; typeof current == 'object' && !~leafPrototypes.indexOf(current); current = getProto(current)) {
+/******/ 			Object.getOwnPropertyNames(current).forEach((key) => (def[key] = () => (value[key])));
+/******/ 		}
+/******/ 		def['default'] = () => (value);
+/******/ 		__nccwpck_require__.d(ns, def);
+/******/ 		return ns;
+/******/ 	};
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/define property getters */
 /******/ (() => {
 /******/ 	// define getter functions for harmony exports
@@ -29224,12 +29254,64 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("util");
 /******/ 	__nccwpck_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
 /******/ })();
 /******/ 
+/******/ /* webpack/runtime/make namespace object */
+/******/ (() => {
+/******/ 	// define __esModule on exports
+/******/ 	__nccwpck_require__.r = (exports) => {
+/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 		}
+/******/ 		Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 	};
+/******/ })();
+/******/ 
 /************************************************************************/
 var __webpack_exports__ = {};
 
-// EXPORTS
-__nccwpck_require__.d(__webpack_exports__, {
-  e: () => (/* binding */ run)
+// NAMESPACE OBJECT: ./node_modules/@actions/core/lib/platform.js
+var platform_namespaceObject = {};
+__nccwpck_require__.r(platform_namespaceObject);
+__nccwpck_require__.d(platform_namespaceObject, {
+  arch: () => (arch),
+  getDetails: () => (getDetails),
+  isLinux: () => (isLinux),
+  isMacOS: () => (isMacOS),
+  isWindows: () => (isWindows),
+  platform: () => (platform)
+});
+
+// NAMESPACE OBJECT: ./node_modules/@actions/core/lib/core.js
+var core_namespaceObject = {};
+__nccwpck_require__.r(core_namespaceObject);
+__nccwpck_require__.d(core_namespaceObject, {
+  ExitCode: () => (ExitCode),
+  addPath: () => (addPath),
+  debug: () => (debug),
+  endGroup: () => (endGroup),
+  error: () => (error),
+  exportVariable: () => (exportVariable),
+  getBooleanInput: () => (getBooleanInput),
+  getIDToken: () => (getIDToken),
+  getInput: () => (getInput),
+  getMultilineInput: () => (getMultilineInput),
+  getState: () => (getState),
+  group: () => (group),
+  info: () => (info),
+  isDebug: () => (isDebug),
+  markdownSummary: () => (markdownSummary),
+  notice: () => (notice),
+  platform: () => (platform_namespaceObject),
+  saveState: () => (saveState),
+  setCommandEcho: () => (setCommandEcho),
+  setFailed: () => (setFailed),
+  setOutput: () => (setOutput),
+  setSecret: () => (setSecret),
+  startGroup: () => (startGroup),
+  summary: () => (summary),
+  toPlatformPath: () => (toPlatformPath),
+  toPosixPath: () => (toPosixPath),
+  toWin32Path: () => (toWin32Path),
+  warning: () => (warning)
 });
 
 ;// CONCATENATED MODULE: external "os"
@@ -29241,7 +29323,7 @@ const external_os_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
  */
-function utils_toCommandValue(input) {
+function toCommandValue(input) {
     if (input === null || input === undefined) {
         return '';
     }
@@ -29256,7 +29338,7 @@ function utils_toCommandValue(input) {
  * @returns The command properties to send with the actual annotation command
  * See IssueCommandProperties: https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionCommandManager.cs#L646
  */
-function utils_toCommandProperties(annotationProperties) {
+function toCommandProperties(annotationProperties) {
     if (!Object.keys(annotationProperties).length) {
         return {};
     }
@@ -29306,12 +29388,12 @@ function utils_toCommandProperties(annotationProperties) {
  * This is an internal utility function that powers the public API functions
  * such as setSecret, warning, error, and exportVariable.
  */
-function command_issueCommand(command, properties, message) {
+function issueCommand(command, properties, message) {
     const cmd = new Command(command, properties, message);
     process.stdout.write(cmd.toString() + external_os_namespaceObject.EOL);
 }
-function command_issue(name, message = '') {
-    command_issueCommand(name, {}, message);
+function issue(name, message = '') {
+    issueCommand(name, {}, message);
 }
 const CMD_STRING = '::';
 class Command {
@@ -29348,13 +29430,13 @@ class Command {
     }
 }
 function escapeData(s) {
-    return utils_toCommandValue(s)
+    return toCommandValue(s)
         .replace(/%/g, '%25')
         .replace(/\r/g, '%0D')
         .replace(/\n/g, '%0A');
 }
 function escapeProperty(s) {
-    return utils_toCommandValue(s)
+    return toCommandValue(s)
         .replace(/%/g, '%25')
         .replace(/\r/g, '%0D')
         .replace(/\n/g, '%0A')
@@ -29374,7 +29456,7 @@ const external_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta
 
 
 
-function file_command_issueFileCommand(command, message) {
+function issueFileCommand(command, message) {
     const filePath = process.env[`GITHUB_${command}`];
     if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
@@ -29382,13 +29464,13 @@ function file_command_issueFileCommand(command, message) {
     if (!external_fs_namespaceObject.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
     }
-    external_fs_namespaceObject.appendFileSync(filePath, `${utils_toCommandValue(message)}${external_os_namespaceObject.EOL}`, {
+    external_fs_namespaceObject.appendFileSync(filePath, `${toCommandValue(message)}${external_os_namespaceObject.EOL}`, {
         encoding: 'utf8'
     });
 }
-function file_command_prepareKeyValueMessage(key, value) {
+function prepareKeyValueMessage(key, value) {
     const delimiter = `ghadelimiter_${external_crypto_namespaceObject.randomUUID()}`;
-    const convertedValue = utils_toCommandValue(value);
+    const convertedValue = toCommandValue(value);
     // These should realistically never happen, but just in case someone finds a
     // way to exploit uuid generation let's not allow keys or values that contain
     // the delimiter.
@@ -29405,8 +29487,10 @@ function file_command_prepareKeyValueMessage(key, value) {
 const external_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("path");
 // EXTERNAL MODULE: external "http"
 var external_http_ = __nccwpck_require__(8611);
+var external_http_namespaceObject = /*#__PURE__*/__nccwpck_require__.t(external_http_, 2);
 // EXTERNAL MODULE: external "https"
 var external_https_ = __nccwpck_require__(5692);
+var external_https_namespaceObject = /*#__PURE__*/__nccwpck_require__.t(external_https_, 2);
 ;// CONCATENATED MODULE: ./node_modules/@actions/http-client/lib/proxy.js
 function getProxyUrl(reqUrl) {
     const usingSsl = reqUrl.protocol === 'https:';
@@ -29499,7 +29583,7 @@ class DecodedURL extends URL {
 }
 //# sourceMappingURL=proxy.js.map
 // EXTERNAL MODULE: ./node_modules/tunnel/index.js
-var node_modules_tunnel = __nccwpck_require__(770);
+var tunnel = __nccwpck_require__(770);
 // EXTERNAL MODULE: ./node_modules/undici/index.js
 var undici = __nccwpck_require__(6752);
 ;// CONCATENATED MODULE: ./node_modules/@actions/http-client/lib/index.js
@@ -29577,7 +29661,7 @@ const HttpResponseRetryCodes = [
     HttpCodes.ServiceUnavailable,
     HttpCodes.GatewayTimeout
 ];
-const RetryableHttpVerbs = (/* unused pure expression or super */ null && (['OPTIONS', 'GET', 'DELETE', 'HEAD']));
+const RetryableHttpVerbs = ['OPTIONS', 'GET', 'DELETE', 'HEAD'];
 const ExponentialBackoffCeiling = 10;
 const ExponentialBackoffTimeSlice = 5;
 class HttpClientError extends Error {
@@ -29623,7 +29707,7 @@ function isHttps(requestUrl) {
     const parsedUrl = new URL(requestUrl);
     return parsedUrl.protocol === 'https:';
 }
-class lib_HttpClient {
+class HttpClient {
     constructor(userAgent, handlers, requestOptions) {
         this._ignoreSslError = false;
         this._allowRedirects = true;
@@ -29926,7 +30010,7 @@ class lib_HttpClient {
     }
     getAgentDispatcher(serverUrl) {
         const parsedUrl = new URL(serverUrl);
-        const proxyUrl = pm.getProxyUrl(parsedUrl);
+        const proxyUrl = getProxyUrl(parsedUrl);
         const useProxy = proxyUrl && proxyUrl.hostname;
         if (!useProxy) {
             return;
@@ -29937,7 +30021,7 @@ class lib_HttpClient {
         const info = {};
         info.parsedUrl = requestUrl;
         const usingSsl = info.parsedUrl.protocol === 'https:';
-        info.httpModule = usingSsl ? https : http;
+        info.httpModule = usingSsl ? external_https_namespaceObject : external_http_namespaceObject;
         const defaultPort = usingSsl ? 443 : 80;
         info.options = {};
         info.options.host = info.parsedUrl.hostname;
@@ -30036,7 +30120,7 @@ class lib_HttpClient {
     }
     _getAgent(parsedUrl) {
         let agent;
-        const proxyUrl = pm.getProxyUrl(parsedUrl);
+        const proxyUrl = getProxyUrl(parsedUrl);
         const useProxy = proxyUrl && proxyUrl.hostname;
         if (this._keepAlive && useProxy) {
             agent = this._proxyAgent;
@@ -30051,7 +30135,7 @@ class lib_HttpClient {
         const usingSsl = parsedUrl.protocol === 'https:';
         let maxSockets = 100;
         if (this.requestOptions) {
-            maxSockets = this.requestOptions.maxSockets || http.globalAgent.maxSockets;
+            maxSockets = this.requestOptions.maxSockets || external_http_.globalAgent.maxSockets;
         }
         // This is `useProxy` again, but we need to check `proxyURl` directly for TypeScripts's flow analysis.
         if (proxyUrl && proxyUrl.hostname) {
@@ -30076,7 +30160,7 @@ class lib_HttpClient {
         // if tunneling agent isn't assigned create a new agent
         if (!agent) {
             const options = { keepAlive: this._keepAlive, maxSockets };
-            agent = usingSsl ? new https.Agent(options) : new http.Agent(options);
+            agent = usingSsl ? new external_https_.Agent(options) : new external_http_.Agent(options);
             this._agent = agent;
         }
         if (usingSsl && this._ignoreSslError) {
@@ -30099,7 +30183,7 @@ class lib_HttpClient {
             return proxyAgent;
         }
         const usingSsl = parsedUrl.protocol === 'https:';
-        proxyAgent = new ProxyAgent(Object.assign({ uri: proxyUrl.href, pipelining: !this._keepAlive ? 0 : 1 }, ((proxyUrl.username || proxyUrl.password) && {
+        proxyAgent = new undici.ProxyAgent(Object.assign({ uri: proxyUrl.href, pipelining: !this._keepAlive ? 0 : 1 }, ((proxyUrl.username || proxyUrl.password) && {
             token: `Basic ${Buffer.from(`${proxyUrl.username}:${proxyUrl.password}`).toString('base64')}`
         })));
         this._proxyAgentDispatcher = proxyAgent;
@@ -30230,7 +30314,7 @@ class BasicCredentialHandler {
         });
     }
 }
-class auth_BearerCredentialHandler {
+class BearerCredentialHandler {
     constructor(token) {
         this.token = token;
     }
@@ -30288,13 +30372,13 @@ var oidc_utils_awaiter = (undefined && undefined.__awaiter) || function (thisArg
 
 
 
-class oidc_utils_OidcClient {
+class OidcClient {
     static createHttpClient(allowRetry = true, maxRetry = 10) {
         const requestOptions = {
             allowRetries: allowRetry,
             maxRetries: maxRetry
         };
-        return new HttpClient('actions/oidc-client', [new BearerCredentialHandler(oidc_utils_OidcClient.getRequestToken())], requestOptions);
+        return new HttpClient('actions/oidc-client', [new BearerCredentialHandler(OidcClient.getRequestToken())], requestOptions);
     }
     static getRequestToken() {
         const token = process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
@@ -30313,7 +30397,7 @@ class oidc_utils_OidcClient {
     static getCall(id_token_url) {
         return oidc_utils_awaiter(this, void 0, void 0, function* () {
             var _a;
-            const httpclient = oidc_utils_OidcClient.createHttpClient();
+            const httpclient = OidcClient.createHttpClient();
             const res = yield httpclient
                 .getJson(id_token_url)
                 .catch(error => {
@@ -30332,13 +30416,13 @@ class oidc_utils_OidcClient {
         return oidc_utils_awaiter(this, void 0, void 0, function* () {
             try {
                 // New ID Token is requested from action service
-                let id_token_url = oidc_utils_OidcClient.getIDTokenUrl();
+                let id_token_url = OidcClient.getIDTokenUrl();
                 if (audience) {
                     const encodedAudience = encodeURIComponent(audience);
                     id_token_url = `${id_token_url}&audience=${encodedAudience}`;
                 }
                 debug(`ID token url is ${id_token_url}`);
-                const id_token = yield oidc_utils_OidcClient.getCall(id_token_url);
+                const id_token = yield OidcClient.getCall(id_token_url);
                 setSecret(id_token);
                 return id_token;
             }
@@ -30627,8 +30711,8 @@ const _summary = new Summary();
 /**
  * @deprecated use `core.summary`
  */
-const markdownSummary = (/* unused pure expression or super */ null && (_summary));
-const summary = (/* unused pure expression or super */ null && (_summary));
+const markdownSummary = _summary;
+const summary = _summary;
 //# sourceMappingURL=summary.js.map
 ;// CONCATENATED MODULE: ./node_modules/@actions/core/lib/path-utils.js
 
@@ -30661,7 +30745,7 @@ function toWin32Path(pth) {
  * @return string The platform-specific path.
  */
 function toPlatformPath(pth) {
-    return pth.replace(/[/\\]/g, path.sep);
+    return pth.replace(/[/\\]/g, external_path_namespaceObject.sep);
 }
 //# sourceMappingURL=path-utils.js.map
 // EXTERNAL MODULE: external "string_decoder"
@@ -31736,16 +31820,16 @@ var exec_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
  * @param     options            optional exec options.  See ExecOptions
  * @returns   Promise<number>    exit code
  */
-function exec_exec(commandLine, args, options) {
+function exec(commandLine, args, options) {
     return exec_awaiter(this, void 0, void 0, function* () {
-        const commandArgs = tr.argStringToArray(commandLine);
+        const commandArgs = argStringToArray(commandLine);
         if (commandArgs.length === 0) {
             throw new Error(`Parameter 'commandLine' cannot be null or empty.`);
         }
         // Path to tool to execute should be first arg
         const toolPath = commandArgs[0];
         args = commandArgs.slice(1).concat(args || []);
-        const runner = new tr.ToolRunner(toolPath, args, options);
+        const runner = new ToolRunner(toolPath, args, options);
         return runner.exec();
     });
 }
@@ -31765,8 +31849,8 @@ function getExecOutput(commandLine, args, options) {
         let stdout = '';
         let stderr = '';
         //Using string decoder covers the case where a mult-byte character is split
-        const stdoutDecoder = new StringDecoder('utf8');
-        const stderrDecoder = new StringDecoder('utf8');
+        const stdoutDecoder = new external_string_decoder_.StringDecoder('utf8');
+        const stderrDecoder = new external_string_decoder_.StringDecoder('utf8');
         const originalStdoutListener = (_a = options === null || options === void 0 ? void 0 : options.listeners) === null || _a === void 0 ? void 0 : _a.stdout;
         const originalStdErrListener = (_b = options === null || options === void 0 ? void 0 : options.listeners) === null || _b === void 0 ? void 0 : _b.stderr;
         const stdErrListener = (data) => {
@@ -31782,7 +31866,7 @@ function getExecOutput(commandLine, args, options) {
             }
         };
         const listeners = Object.assign(Object.assign({}, options === null || options === void 0 ? void 0 : options.listeners), { stdout: stdOutListener, stderr: stdErrListener });
-        const exitCode = yield exec_exec(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
+        const exitCode = yield exec(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
         //flush any remaining characters
         stdout += stdoutDecoder.end();
         stderr += stderrDecoder.end();
@@ -31807,10 +31891,10 @@ var platform_awaiter = (undefined && undefined.__awaiter) || function (thisArg, 
 
 
 const getWindowsInfo = () => platform_awaiter(void 0, void 0, void 0, function* () {
-    const { stdout: version } = yield exec.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Version"', undefined, {
+    const { stdout: version } = yield getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Version"', undefined, {
         silent: true
     });
-    const { stdout: name } = yield exec.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Caption"', undefined, {
+    const { stdout: name } = yield getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Caption"', undefined, {
         silent: true
     });
     return {
@@ -31820,7 +31904,7 @@ const getWindowsInfo = () => platform_awaiter(void 0, void 0, void 0, function* 
 });
 const getMacOsInfo = () => platform_awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d;
-    const { stdout } = yield exec.getExecOutput('sw_vers', undefined, {
+    const { stdout } = yield getExecOutput('sw_vers', undefined, {
         silent: true
     });
     const version = (_b = (_a = stdout.match(/ProductVersion:\s*(.+)/)) === null || _a === void 0 ? void 0 : _a[1]) !== null && _b !== void 0 ? _b : '';
@@ -31831,7 +31915,7 @@ const getMacOsInfo = () => platform_awaiter(void 0, void 0, void 0, function* ()
     };
 });
 const getLinuxInfo = () => platform_awaiter(void 0, void 0, void 0, function* () {
-    const { stdout } = yield exec.getExecOutput('lsb_release', ['-i', '-r', '-s'], {
+    const { stdout } = yield getExecOutput('lsb_release', ['-i', '-r', '-s'], {
         silent: true
     });
     const [name, version] = stdout.trim().split('\n');
@@ -31936,7 +32020,7 @@ function exportVariable(name, val) {
  * console.log(`Using token: ${apiToken}`); // Outputs: "Using token: ***"
  * ```
  */
-function core_setSecret(secret) {
+function setSecret(secret) {
     issueCommand('add-mask', {}, secret);
 }
 /**
@@ -31951,7 +32035,7 @@ function addPath(inputPath) {
     else {
         issueCommand('add-path', {}, inputPath);
     }
-    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
+    process.env['PATH'] = `${inputPath}${external_path_namespaceObject.delimiter}${process.env['PATH']}`;
 }
 /**
  * Gets the value of an input.
@@ -32020,10 +32104,10 @@ function getBooleanInput(name, options) {
 function setOutput(name, value) {
     const filePath = process.env['GITHUB_OUTPUT'] || '';
     if (filePath) {
-        return file_command_issueFileCommand('OUTPUT', file_command_prepareKeyValueMessage(name, value));
+        return issueFileCommand('OUTPUT', prepareKeyValueMessage(name, value));
     }
     process.stdout.write(external_os_namespaceObject.EOL);
-    command_issueCommand('set-output', { name }, utils_toCommandValue(value));
+    issueCommand('set-output', { name }, toCommandValue(value));
 }
 /**
  * Enables or disables the echoing of commands into stdout for the rest of the step.
@@ -32058,7 +32142,7 @@ function isDebug() {
  * Writes debug message to user log
  * @param message debug message
  */
-function core_debug(message) {
+function debug(message) {
     issueCommand('debug', {}, message);
 }
 /**
@@ -32067,7 +32151,7 @@ function core_debug(message) {
  * @param properties optional properties to add to the annotation.
  */
 function error(message, properties = {}) {
-    command_issueCommand('error', utils_toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
  * Adds a warning issue
@@ -37177,6 +37261,46 @@ function getOctokit(token, options, ...additionalPlugins) {
     return new GitHubWithPlugins(getOctokitOptions(token, options));
 }
 //# sourceMappingURL=github.js.map
+;// CONCATENATED MODULE: ./src/GitHubClient.ts
+
+class GitHubClient {
+    octokit;
+    constructor(options = {}) {
+        this.octokit = new Octokit({
+            auth: options.token,
+            ...(options.baseUrl !== undefined && { baseUrl: options.baseUrl })
+        });
+    }
+    async request(route, params = {}) {
+        const result = await this.octokit.request(route, {
+            ...params,
+            headers: { 'X-GitHub-Api-Version': '2022-11-28' }
+        });
+        return result.data;
+    }
+    async paginate(route, params = {}, options = {}) {
+        const perPage = 100;
+        const maxPages = 99;
+        let result = [];
+        for (let page = 1; page <= maxPages; page++) {
+            const items = await this.request(route, {
+                ...params,
+                per_page: perPage,
+                page
+            });
+            const stopAt = options.until ? items.findIndex(options.until) : -1;
+            if (stopAt >= 0) {
+                return result.concat(items.slice(0, stopAt));
+            }
+            result = result.concat(items);
+            if (items.length < perPage) {
+                break;
+            }
+        }
+        return result;
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/ReleaseAdapter.ts
 
 class ReleaseAdapter {
@@ -37579,132 +37703,107 @@ class LeadTime {
     }
 }
 
-;// CONCATENATED MODULE: ./src/GitHubClient.ts
+;// CONCATENATED MODULE: ./src/main.ts
 
-class GitHubClient {
-    octokit;
-    constructor(options = {}) {
-        this.octokit = new Octokit({
-            auth: options.token,
-            ...(options.baseUrl !== undefined && { baseUrl: options.baseUrl })
-        });
+
+
+
+
+
+
+
+function parseInputs(core, context, env) {
+    let repo = core.getInput('repo');
+    if (repo === '' || repo === null) {
+        repo = context.repo.repo;
+        core.info(`${context.repo.repo} - default repo.`);
     }
-    async request(route, params = {}) {
-        const result = await this.octokit.request(route, {
-            ...params,
-            headers: { 'X-GitHub-Api-Version': '2022-11-28' }
-        });
-        return result.data;
+    // Allow for multiple repos, ex: [val1, val2, val3]
+    const repositories = repo
+        .split(/[[\]\n,]+/)
+        .map(s => s.trim())
+        .filter(x => x !== '');
+    let owner = core.getInput('owner');
+    if (owner === '' || owner === null) {
+        owner = context.repo.owner;
+        core.info(`${context.repo.owner} - default owner.`);
     }
-    async paginate(route, params = {}, options = {}) {
-        const perPage = 100;
-        const maxPages = 99;
-        let result = [];
-        for (let page = 1; page <= maxPages; page++) {
-            const items = await this.request(route, {
-                ...params,
-                per_page: perPage,
-                page
-            });
-            const stopAt = options.until ? items.findIndex(options.until) : -1;
-            if (stopAt >= 0) {
-                return result.concat(items.slice(0, stopAt));
-            }
-            result = result.concat(items);
-            if (items.length < perPage) {
-                break;
-            }
-        }
-        return result;
+    for (const repository of repositories) {
+        core.info(`${owner}/${repository}`);
     }
+    const repoCount = repositories.length;
+    if (repoCount > 1) {
+        core.info(`${repoCount.toString()} repositories registered.`);
+    }
+    else {
+        core.info(`${repoCount.toString()} repository registered.`);
+    }
+    let token = core.getInput('token');
+    if (token === '' || token === null) {
+        token = env.GH_TOKEN;
+    }
+    return {
+        owner,
+        repositories,
+        token,
+        logging: core.getInput('logging') === 'true',
+        filtered: core.getInput('filtered') === 'true',
+        bugLabel: core.getInput('bug-label') || 'bug'
+    };
+}
+async function run({ inputs, client, core }) {
+    const { owner, repositories, logging, filtered, bugLabel } = inputs;
+    const outputs = {};
+    const emit = (name, value) => {
+        outputs[name] = value;
+        core.setOutput(name, value);
+    };
+    const rel = new ReleaseAdapter(client, owner, repositories);
+    const releaseList = (await rel.GetAllReleasesLastMonth());
+    const df = new DeployFrequency(releaseList);
+    emit('deploy-rate', df.rate());
+    if (logging) {
+        emit('deploy-rate-log', df.getLog().join('\n'));
+    }
+    const prs = new PullRequestsAdapter(client, owner, repositories);
+    const commits = new CommitsAdapter(client);
+    const pulls = (await prs.GetAllPRsLastMonth());
+    const lt = new LeadTime(pulls, releaseList, commits);
+    emit('lead-time', await lt.getLeadTime(filtered));
+    if (logging) {
+        emit('lead-time-log', lt.getLog().join('\n'));
+    }
+    const issueAdapter = new IssuesAdapter(client, owner, repositories);
+    const issueList = await issueAdapter.GetAllIssuesLastMonth();
+    if (issueList) {
+        const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel);
+        emit('change-failure-rate', cfr.Cfr());
+        const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel);
+        emit('mttr', mttr.mttr());
+    }
+    else {
+        emit('change-failure-rate', 'empty issue list');
+        emit('mttr', 'empty issue list');
+    }
+    return outputs;
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 
 
 
-
-
-
-
-
-
-
-async function run() {
+// Bootstrap only: wires the Actions runtime into the testable run() in main.ts.
+async function bootstrap() {
     try {
-        let repo = getInput('repo');
-        if (repo === '' || repo === null) {
-            repo = github_context.repo.repo;
-            info(`${github_context.repo.repo} - default repo.`);
-        }
-        // Allow for multiple repos, ex: [val1, val2, val3]
-        const repositories = repo
-            .split(/[[\]\n,]+/)
-            .map(s => s.trim())
-            .filter(x => x !== '');
-        let owner = getInput('owner');
-        if (owner === '' || owner === null) {
-            owner = github_context.repo.owner;
-            info(`${github_context.repo.owner} - default owner.`);
-        }
-        for (const repository of repositories) {
-            info(`${owner}/${repository}`);
-        }
-        const repoCount = repositories.length;
-        if (repoCount > 1) {
-            info(`${repoCount.toString()} repositories registered.`);
-        }
-        else {
-            info(`${repoCount.toString()} repository registered.`);
-        }
-        repo = repositories[0];
-        let token = getInput('token');
-        if (token === '' || token === null) {
-            // token = github.context.token;
-            token = process.env.GH_TOKEN;
-        }
-        const logging = getInput('logging');
-        const filtered = getInput('filtered') === 'true' ? true : false;
-        const bugLabel = getInput('bug-label') || 'bug';
-        const client = new GitHubClient({ token });
-        const rel = new ReleaseAdapter(client, owner, repositories);
-        const releaseList = (await rel.GetAllReleasesLastMonth());
-        const df = new DeployFrequency(releaseList);
-        setOutput('deploy-rate', df.rate());
-        if (logging === 'true') {
-            setOutput('deploy-rate-log', df.getLog().join('\n'));
-        }
-        const prs = new PullRequestsAdapter(client, owner, repositories);
-        const commits = new CommitsAdapter(client);
-        const pulls = (await prs.GetAllPRsLastMonth());
-        const lt = new LeadTime(pulls, releaseList, commits);
-        const leadTime = await lt.getLeadTime(filtered);
-        setOutput('lead-time', leadTime);
-        if (logging === 'true') {
-            setOutput('lead-time-log', lt.getLog().join('\n'));
-        }
-        const issueAdapter = new IssuesAdapter(client, owner, repositories);
-        const issueList = await issueAdapter.GetAllIssuesLastMonth();
-        if (issueList) {
-            const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel);
-            setOutput('change-failure-rate', cfr.Cfr());
-            const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel);
-            setOutput('mttr', mttr.mttr());
-        }
-        else {
-            setOutput('change-failure-rate', 'empty issue list');
-            setOutput('mttr', 'empty issue list');
-        }
+        const inputs = parseInputs(core_namespaceObject, github_context, process.env);
+        await run({ inputs, client: new GitHubClient({ token: inputs.token }), core: core_namespaceObject });
     }
     catch (error) {
-        setFailed(error.message);
+        setFailed(error instanceof Error ? error.message : String(error));
     }
 }
-run();
+void bootstrap();
 
-var __webpack_exports__run = __webpack_exports__.e;
-export { __webpack_exports__run as run };
 
 //# sourceMappingURL=index.js.map
