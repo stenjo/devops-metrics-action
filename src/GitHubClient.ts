@@ -12,6 +12,25 @@ export interface PaginateOptions<T> {
   until?: (item: T) => boolean
 }
 
+// Stable, URL/body-free failure message; the raw Octokit error is kept as `cause`.
+export class GitHubApiError extends Error {
+  readonly status: number | undefined
+  readonly route: string
+
+  constructor(route: string, cause: unknown) {
+    const status =
+      typeof (cause as {status?: unknown})?.status === 'number'
+        ? (cause as {status: number}).status
+        : undefined
+    super(`GitHub API request failed (${status ?? 'unknown'}) for ${route}`, {
+      cause
+    })
+    this.name = 'GitHubApiError'
+    this.status = status
+    this.route = route
+  }
+}
+
 export class GitHubClient {
   readonly octokit: Octokit
 
@@ -23,11 +42,15 @@ export class GitHubClient {
   }
 
   async request<T>(route: string, params: RequestParams = {}): Promise<T> {
-    const result = await this.octokit.request(route, {
-      ...params,
-      headers: {'X-GitHub-Api-Version': '2022-11-28'}
-    })
-    return result.data as T
+    try {
+      const result = await this.octokit.request(route, {
+        ...params,
+        headers: {'X-GitHub-Api-Version': '2022-11-28'}
+      })
+      return result.data as T
+    } catch (e: unknown) {
+      throw new GitHubApiError(route, e)
+    }
   }
 
   async paginate<T>(

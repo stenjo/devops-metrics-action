@@ -1,4 +1,3 @@
-import type {PullRequest} from '../src/types/PullRequest'
 import type {GitHubPullRequestPayload} from '../src/github/payloads'
 import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
 import {GitHubClient} from '../src/GitHubClient'
@@ -17,7 +16,7 @@ test('PullRequestsAdapter should', async () => {
       return pulls.slice((page - 1) * 100, (page - 1) * 100 + 100)
     }
   )
-  const pr = (await pullRequests.GetAllPRsLastMonth()) as PullRequest[]
+  const pr = await pullRequests.GetAllPRsLastMonth()
 
   expect(pr.length).toBe(2)
   expect(pr[1]).toEqual({

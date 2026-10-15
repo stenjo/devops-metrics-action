@@ -1,8 +1,7 @@
 import {http, HttpResponse} from 'msw'
 import {setupServer} from 'msw/node'
-import {setFailed} from '@actions/core'
 import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
-import {GitHubClient} from '../src/GitHubClient'
+import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
 import type {PullRequest} from '../src/types/PullRequest'
 import type {GitHubPullRequestPayload} from '../src/github/payloads'
 import {pullRequestPayload} from './helpers/payloads'
@@ -22,10 +21,6 @@ const server = setupServer(
     }
   )
 )
-vi.mock('@actions/core', () => ({
-  setFailed: vi.fn()
-}))
-
 describe('PullRequest Adapter should', () => {
   beforeAll(() => server.listen())
 
@@ -46,8 +41,7 @@ describe('PullRequest Adapter should', () => {
       'project1'
     ])
 
-    const pullRequests: PullRequest[] =
-      (await r.GetAllPRsLastMonth()) as PullRequest[]
+    const pullRequests: PullRequest[] = await r.GetAllPRsLastMonth()
 
     expect(pullRequests.length).toBe(150)
   })
@@ -59,7 +53,7 @@ describe('PullRequest Adapter should', () => {
         'https://api.github.com/repos/:owner/:rep/pulls',
         ({request}) => {
           seen.push(request)
-          return HttpResponse.json([{id: 1}])
+          return HttpResponse.json([pullRequestPayload({id: 1})])
         }
       )
     )
@@ -100,7 +94,7 @@ describe('PullRequest Adapter should', () => {
       'project1'
     ])
 
-    const pullRequests = (await r.GetAllPRsLastMonth()) as PullRequest[]
+    const pullRequests = await r.GetAllPRsLastMonth()
 
     expect(pages.length).toBe(99)
     expect(pages[0]).toBe('1')
@@ -109,24 +103,24 @@ describe('PullRequest Adapter should', () => {
     expect(pullRequests.length).toBe(9900)
   })
 
-  it('handles access denied', async () => {
-    server.close()
-    const errorServer = setupServer(
+  it('throw a GitHubApiError on access denied', async () => {
+    server.use(
       http.get(
         'https://api.github.com/repos/:owner/:rep/pulls',
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({request, params, cookies}) => {
-          return new HttpResponse('access denied', {status: 401})
-        }
+        () => new HttpResponse('access denied', {status: 401})
       )
     )
-    errorServer.listen()
     const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
       'project1'
     ])
-    const result = await r.GetAllPRsLastMonth()
-    expect(result).toBe(undefined)
-    expect(setFailed).toHaveBeenCalledWith('access denied')
-    errorServer.close()
+
+    const error = await r.GetAllPRsLastMonth().catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(GitHubApiError)
+    expect(error).toMatchObject({
+      message:
+        'GitHub API request failed (401) for GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}',
+      status: 401
+    })
   })
 })

@@ -1,7 +1,6 @@
 import type {PullRequest} from './types/PullRequest'
 import type {Release} from './types/Release'
 import type {ICommitsAdapter} from './interfaces/ICommitsAdapter'
-import type {Commit} from './types/Commit'
 import {isoTimestamp} from './types/Timestamp'
 
 type MergedPullRequest = PullRequest & {mergedAt: number}
@@ -68,9 +67,9 @@ export class LeadTime {
       this.log.push(
         `pull->      ${isoTimestamp(pull.mergedAt)} : ${pull.title}`
       )
-      const commits = (await this.commitsAdapter.getCommitsFromUrl(
+      const commits = await this.commitsAdapter.getCommitsFromUrl(
         pull.commitsUrl
-      )) as Commit[]
+      )
       const firstCommit = commits.sort(
         (a, b) => a.committedAt - b.committedAt
       )[0]

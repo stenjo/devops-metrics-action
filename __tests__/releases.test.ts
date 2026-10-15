@@ -9,7 +9,7 @@ describe('Mocked Release API should', () => {
     const r = new ReleaseAdapter(new GitHubClient(), 'TestOwner', ['Project1'])
     mockedGetReleasesReturns('./__tests__/test-data/releases.json')
 
-    const releases: Release[] = (await r.GetAllReleasesLastMonth()) as Release[]
+    const releases: Release[] = await r.GetAllReleasesLastMonth()
 
     expect(releases.length).toBe(7)
     expect(releases[0]).toEqual({

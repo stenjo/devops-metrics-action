@@ -1,11 +1,9 @@
 import {CommitsAdapter} from '../src/CommitsAdapter'
-import {GitHubClient} from '../src/GitHubClient'
+import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
 import {Octokit} from '@octokit/core'
-import * as core from '@actions/core'
 import {commitPayload} from './helpers/payloads'
 
 vi.mock('@octokit/core')
-vi.mock('@actions/core')
 
 describe('CommitsAdapter', () => {
   let adapter: CommitsAdapter
@@ -56,35 +54,40 @@ describe('CommitsAdapter', () => {
     // Test with missing headers
     await expect(adapter.getCommitsFromUrl(url)).resolves.toBeDefined()
 
-    // Test with incorrect headers - error is caught and setFailed is called
+    // Test with incorrect headers - the client wraps the error and rethrows it
     mockRequest.mockClear()
     mockRequest.mockImplementation(() => {
       throw new Error('Incorrect headers')
     })
-    const result = await adapter.getCommitsFromUrl(url)
-    expect(result).toBeUndefined()
-    expect(core.setFailed).toHaveBeenCalledWith('Incorrect headers')
+    await expect(adapter.getCommitsFromUrl(url)).rejects.toThrow(
+      `GitHub API request failed (unknown) for ${url}`
+    )
   })
 
-  it('should handle errors during API call', async () => {
+  it('should rethrow API failures as GitHubApiError without swallowing them', async () => {
     const url = 'https://api.github.com/repos/owner/repo/commits'
-    const errorMessage = 'API call failed'
-    mockRequest.mockRejectedValue(new Error(errorMessage))
+    const cause = Object.assign(new Error('API call failed'), {status: 502})
+    mockRequest.mockRejectedValue(cause)
 
-    const commits = await adapter.getCommitsFromUrl(url)
+    const error = await adapter.getCommitsFromUrl(url).catch((e: unknown) => e)
 
-    expect(core.setFailed).toHaveBeenCalledWith(errorMessage)
-    expect(commits).toBeUndefined()
+    expect(error).toBeInstanceOf(GitHubApiError)
+    expect(error).toMatchObject({
+      message: `GitHub API request failed (502) for ${url}`,
+      status: 502,
+      route: url,
+      cause
+    })
   })
 
-  it('should handle empty or invalid URL', async () => {
+  it('should reject on an empty or invalid URL', async () => {
     const url = ''
     mockRequest.mockRejectedValue(new Error('Invalid URL'))
-    const commits = await adapter.getCommitsFromUrl(url)
 
+    await expect(adapter.getCommitsFromUrl(url)).rejects.toThrow(
+      'GitHub API request failed (unknown) for '
+    )
     expect(mockRequest).toHaveBeenCalled()
-    expect(core.setFailed).toHaveBeenCalledWith('Invalid URL')
-    expect(commits).toBeUndefined()
   })
 
   it('should expose the injected client', () => {
