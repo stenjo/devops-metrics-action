@@ -78,7 +78,13 @@ jobs:
           git add badges/coverage.svg data/coverage-summary.json
           if ! git diff --staged --quiet; then
             git commit -m "Update coverage badge and summary [skip ci]"
-            git push
+            # Other badge workflows push to main concurrently; rebase and retry.
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && exit 0
+              echo "Push attempt $i failed, retrying..."
+              sleep 5
+            done
+            exit 1
           fi
 
       - name: Get main coverage for diff
