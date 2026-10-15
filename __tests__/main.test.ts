@@ -8,7 +8,7 @@ import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
 import {CommitsAdapter} from '../src/CommitsAdapter'
 import {LeadTime} from '../src/LeadTime'
 import type {GitHubClient} from '../src/GitHubClient'
-import {parseInputs, run} from '../src/main'
+import {parseInputs, run, TOKEN_REQUIRED_MESSAGE} from '../src/main'
 import type {ActionsContext, Inputs} from '../src/main'
 import type {Release} from '../src/types/Release'
 import type {PullRequest} from '../src/types/PullRequest'
@@ -39,13 +39,15 @@ function fakeCore(inputs: Record<string, string | null>): {
   getInput: Mock<(name: string) => string>
   info: Mock<(message: string) => void>
   setOutput: Mock<(name: string, value: unknown) => void>
+  setSecret: Mock<(secret: string) => void>
 } {
   return {
     getInput: vi.fn((name: string) =>
       name in inputs ? (inputs[name] as string) : ''
     ),
     info: vi.fn(),
-    setOutput: vi.fn()
+    setOutput: vi.fn(),
+    setSecret: vi.fn()
   }
 }
 
@@ -82,13 +84,12 @@ describe('parseInputs', () => {
   })
 
   it('falls back to GH_TOKEN when the token input is empty', () => {
-    const inputs = parseInputs(
-      fakeCore({token: '', repo: 'repo1', owner: 'o'}),
-      context,
-      {GH_TOKEN: 'env-token'}
-    )
+    const fake = fakeCore({token: '', repo: 'repo1', owner: 'o'})
+
+    const inputs = parseInputs(fake, context, {GH_TOKEN: 'env-token'})
 
     expect(inputs.token).toBe('env-token')
+    expect(fake.setSecret).toHaveBeenCalledExactlyOnceWith('env-token')
   })
 
   it('falls back to GH_TOKEN when the token input is null', () => {
@@ -101,14 +102,33 @@ describe('parseInputs', () => {
     expect(inputs.token).toBe('env-token')
   })
 
-  it('leaves the token undefined when neither input nor GH_TOKEN is set', () => {
-    const inputs = parseInputs(
-      fakeCore({repo: 'repo1', owner: 'o'}),
-      context,
-      {}
-    )
+  it('registers the provided token input as a secret', () => {
+    const fake = fakeCore({token: 'provided-token', repo: 'repo1', owner: 'o'})
 
-    expect(inputs.token).toBeUndefined()
+    parseInputs(fake, context, {GH_TOKEN: 'env-token'})
+
+    expect(fake.setSecret).toHaveBeenCalledExactlyOnceWith('provided-token')
+  })
+
+  it.each([
+    ['GH_TOKEN unset', {}],
+    ['GH_TOKEN empty', {GH_TOKEN: ''}]
+  ])(
+    'fails with the required-token message when the token input is empty and %s',
+    (_label, env) => {
+      const fake = fakeCore({repo: 'repo1', owner: 'o'})
+
+      expect(() => parseInputs(fake, context, env)).toThrow(
+        new Error(TOKEN_REQUIRED_MESSAGE)
+      )
+      expect(fake.setSecret).not.toHaveBeenCalled()
+    }
+  )
+
+  it('names both the input and the environment variable in the required-token message', () => {
+    expect(TOKEN_REQUIRED_MESSAGE).toBe(
+      'A GitHub token is required: set the `token` input or the GH_TOKEN environment variable'
+    )
   })
 
   it('uses the context repo and owner when inputs are not provided and logs it', () => {

@@ -37730,6 +37730,7 @@ class LeadTime {
 
 
 
+const TOKEN_REQUIRED_MESSAGE = 'A GitHub token is required: set the `token` input or the GH_TOKEN environment variable';
 function parseInputs(core, context, env) {
     let repo = core.getInput('repo');
     if (repo === '' || repo === null) {
@@ -37760,6 +37761,11 @@ function parseInputs(core, context, env) {
     if (token === '' || token === null) {
         token = env.GH_TOKEN;
     }
+    if (token === undefined || token === '') {
+        throw new Error(TOKEN_REQUIRED_MESSAGE);
+    }
+    // The GH_TOKEN fallback is not masked by the runner unless registered here.
+    core.setSecret(token);
     return {
         owner,
         repositories,

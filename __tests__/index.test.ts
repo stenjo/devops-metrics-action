@@ -72,3 +72,50 @@ describe('index.ts bootstrap', () => {
     expect(run).not.toHaveBeenCalled()
   })
 })
+
+describe('index.ts token resolution (real parseInputs)', () => {
+  const savedGhToken = process.env.GH_TOKEN
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const actual =
+      await vi.importActual<typeof import('../src/main')>('../src/main')
+    vi.mocked(parseInputs).mockImplementation(actual.parseInputs)
+    vi.mocked(core.getInput).mockImplementation((name: string) =>
+      name === 'repo' ? 'repo1' : name === 'owner' ? 'o' : ''
+    )
+  })
+
+  afterEach(() => {
+    if (savedGhToken === undefined) {
+      delete process.env.GH_TOKEN
+    } else {
+      process.env.GH_TOKEN = savedGhToken
+    }
+  })
+
+  it('fails before building a client when neither the token input nor GH_TOKEN is set', async () => {
+    delete process.env.GH_TOKEN
+
+    await importIndex()
+
+    expect(core.setFailed).toHaveBeenCalledExactlyOnceWith(
+      'A GitHub token is required: set the `token` input or the GH_TOKEN environment variable'
+    )
+    expect(GitHubClient).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('registers a GH_TOKEN-sourced token as a secret before building the client', async () => {
+    process.env.GH_TOKEN = 'env-secret'
+
+    await importIndex()
+
+    expect(core.setSecret).toHaveBeenCalledExactlyOnceWith('env-secret')
+    expect(GitHubClient).toHaveBeenCalledWith({token: 'env-secret'})
+    expect(vi.mocked(core.setSecret).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(GitHubClient).mock.invocationCallOrder[0]
+    )
+    expect(core.setFailed).not.toHaveBeenCalled()
+  })
+})

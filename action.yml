@@ -12,8 +12,10 @@ inputs:
     description: 'Repository name'
     required: false
   token: # repository
-    description: 'Repository access token'
+    description: 'Repository access token. Falls back to the GH_TOKEN
+      environment variable when empty.'
     required: false
+    default: ${{ github.token }}
   logging: # history
     description: 'Logging and making the log available when true'
     required: false
