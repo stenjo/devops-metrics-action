@@ -9,6 +9,7 @@ import type {
   GitHubPullRequestPayload,
   GitHubReleasePayload
 } from './payloads'
+import {sanitizeText} from '../sanitize'
 
 export function repoKey(owner: string, repo: string): RepoKey {
   return `${owner.toLowerCase()}/${repo.toLowerCase()}`
@@ -25,7 +26,7 @@ export function toRelease(
 ): Release {
   return {
     repo: repoKey(owner, repo),
-    name: payload.name,
+    name: sanitizeText(payload.name),
     publishedAt: +new Date(payload.published_at)
   }
 }
@@ -37,7 +38,7 @@ export function toPullRequest(
 ): PullRequest {
   return {
     repo: repoKey(owner, repo),
-    title: payload.title,
+    title: sanitizeText(payload.title),
     mergedAt: timestamp(payload.merged_at),
     baseRef: payload.base.ref,
     commitsUrl: payload.commits_url
@@ -60,6 +61,6 @@ export function toIssue(
 export function toCommit(payload: GitHubCommitPayload): Commit {
   return {
     committedAt: +new Date(payload.commit.committer.date),
-    message: payload.commit.message
+    message: sanitizeText(payload.commit.message)
   }
 }

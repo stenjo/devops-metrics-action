@@ -40,6 +40,16 @@ describe('toRelease', () => {
       publishedAt: +new Date('2023-04-30T17:50:53Z')
     })
   })
+
+  it('sanitizes the release name', () => {
+    expect(
+      toRelease('o', 'r', releasePayload({name: ' v1\n`x` ${a} '})).name
+    ).toBe('v1 x {a}')
+    expect(
+      toRelease('o', 'r', releasePayload({name: null as unknown as string}))
+        .name
+    ).toBe('')
+  })
 })
 
 describe('toPullRequest', () => {
@@ -71,6 +81,16 @@ describe('toPullRequest', () => {
     expect(
       toPullRequest('o', 'r', pullRequestPayload({merged_at: ''})).mergedAt
     ).toBeNull()
+  })
+
+  it('sanitizes and truncates the title', () => {
+    const title = `fix:\t${'a'.repeat(300)}`
+
+    const mapped = toPullRequest('o', 'r', pullRequestPayload({title})).title
+
+    expect(mapped).toHaveLength(200)
+    expect(mapped.startsWith('fix: aaa')).toBe(true)
+    expect(mapped.endsWith('…')).toBe(true)
   })
 })
 
@@ -107,6 +127,13 @@ describe('toCommit', () => {
       committedAt: +new Date('2023-04-22T20:41:12Z'),
       message: 'fix: it'
     })
+  })
+
+  it('flattens a multi-line commit message to its sanitized single line', () => {
+    expect(
+      toCommit(commitPayload('2023-04-22T20:41:12Z', 'fix: it\n\nBody `$(x)`'))
+        .message
+    ).toBe('fix: it Body (x)')
   })
 })
 

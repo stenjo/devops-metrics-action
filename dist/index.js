@@ -37322,7 +37322,27 @@ class GitHubClient {
     }
 }
 
+;// CONCATENATED MODULE: ./src/sanitize.ts
+const MAX_TEXT_LENGTH = 200;
+// Regexes are built per call rather than hoisted: module-level constants are
+// static mutants that Stryker cannot attribute to tests (ignoreStatic).
+function sanitizeText(value, maxLength = MAX_TEXT_LENGTH) {
+    const cleaned = (value ?? '')
+        // Control characters incl. newlines, DEL/C1 and Unicode line separators.
+        .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ')
+        // Backticks and `${` / `$(` openers stay inert even if a consumer
+        // interpolates the text into a shell.
+        .replace(/`|\$(?=[{(])/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (cleaned.length <= maxLength) {
+        return cleaned;
+    }
+    return `${cleaned.slice(0, maxLength - 1)}…`;
+}
+
 ;// CONCATENATED MODULE: ./src/github/mappers.ts
+
 function repoKey(owner, repo) {
     return `${owner.toLowerCase()}/${repo.toLowerCase()}`;
 }
@@ -37332,14 +37352,14 @@ function timestamp(value) {
 function toRelease(owner, repo, payload) {
     return {
         repo: repoKey(owner, repo),
-        name: payload.name,
+        name: sanitizeText(payload.name),
         publishedAt: +new Date(payload.published_at)
     };
 }
 function toPullRequest(owner, repo, payload) {
     return {
         repo: repoKey(owner, repo),
-        title: payload.title,
+        title: sanitizeText(payload.title),
         mergedAt: timestamp(payload.merged_at),
         baseRef: payload.base.ref,
         commitsUrl: payload.commits_url
@@ -37356,7 +37376,7 @@ function toIssue(owner, repo, payload) {
 function toCommit(payload) {
     return {
         committedAt: +new Date(payload.commit.committer.date),
-        message: payload.commit.message
+        message: sanitizeText(payload.commit.message)
     };
 }
 
@@ -37416,7 +37436,7 @@ class DeployFrequency {
         for (const release of this.rList) {
             const relDate = new Date(release.publishedAt);
             if (this.days_between(this.today, relDate) < 8) {
-                this.log.push(`release->  ${release.name}:${isoTimestamp(release.publishedAt)}`);
+                this.log.push(this.entry(release));
                 releaseCount++;
             }
         }
@@ -37427,7 +37447,7 @@ class DeployFrequency {
         for (const release of this.rList) {
             const relDate = new Date(release.publishedAt);
             if (this.days_between(this.today, relDate) < 31) {
-                this.log.push(`release->  ${release.name}:${isoTimestamp(release.publishedAt)}`);
+                this.log.push(this.entry(release));
                 releaseCount++;
             }
         }
@@ -37435,6 +37455,13 @@ class DeployFrequency {
     }
     rate() {
         return (Math.round(this.monthly() * 700) / 3000).toFixed(2);
+    }
+    entry(release) {
+        return {
+            kind: 'release',
+            at: isoTimestamp(release.publishedAt),
+            name: release.name
+        };
     }
     days_between(date1, date2) {
         // Calculate the difference in milliseconds
@@ -37677,12 +37704,6 @@ class LeadTime {
         return this.log;
     }
     async getLeadTime(filtered = false) {
-        if (this.pulls.length === 0 || this.releases.length === 0) {
-            return 0;
-        }
-        if (filtered) {
-            this.log.push(`\nLog is filtered - only feat and fix.`);
-        }
         const leadTimes = [];
         for (const pull of this.pulls) {
             if (pull.baseRef !== 'main') {
@@ -37697,14 +37718,20 @@ class LeadTime {
                 continue;
             }
             const deployTime = laterReleases[0].publishedAt;
-            this.log.push(`pull->      ${isoTimestamp(pull.mergedAt)} : ${pull.title}`);
             const commits = await this.commitsAdapter.getCommitsFromUrl(pull.commitsUrl);
             const firstCommit = commits.sort((a, b) => a.committedAt - b.committedAt)[0];
-            this.log.push(`  commit->  ${isoTimestamp(firstCommit.committedAt)} : ${firstCommit.message}`);
-            this.log.push(`  release-> ${isoTimestamp(laterReleases[0].publishedAt)} : ${laterReleases[0].name}`);
             const leadTime = (deployTime - firstCommit.committedAt) / LeadTime_ONE_DAY;
             leadTimes.push(leadTime);
-            this.log.push(`  ${leadTime.toFixed(2)} days`);
+            this.log.push({
+                kind: 'pull',
+                at: isoTimestamp(pull.mergedAt),
+                title: pull.title,
+                commitAt: isoTimestamp(firstCommit.committedAt),
+                commitMessage: firstCommit.message,
+                releaseAt: isoTimestamp(deployTime),
+                release: laterReleases[0].name,
+                leadTimeDays: Math.round(leadTime * 100) / 100
+            });
         }
         if (leadTimes.length === 0) {
             return 0;
@@ -37714,7 +37741,38 @@ class LeadTime {
     }
 }
 
+;// CONCATENATED MODULE: ./src/log.ts
+// GitHub caps a single step output at 1 MiB; stay well under it. A function
+// rather than a constant so the arithmetic is not a static mutant for Stryker.
+function defaultLogLimits() {
+    return { maxEntries: 500, maxBytes: 1024 * 1024 - 1024 };
+}
+// Room reserved for the trailing truncated record and the closing bracket.
+const TRUNCATED_RESERVE = 64;
+function serializeLog(entries, limits = defaultLogLimits()) {
+    const kept = [];
+    let bytes = 2;
+    let omitted = 0;
+    for (const [index, entry] of entries.entries()) {
+        const json = JSON.stringify(entry);
+        const added = Buffer.byteLength(json) + (kept.length > 0 ? 1 : 0);
+        if (index >= limits.maxEntries ||
+            bytes + added + TRUNCATED_RESERVE > limits.maxBytes) {
+            omitted = entries.length - index;
+            break;
+        }
+        kept.push(json);
+        bytes += added;
+    }
+    if (omitted > 0) {
+        const marker = { kind: 'truncated', omitted };
+        kept.push(JSON.stringify(marker));
+    }
+    return `[${kept.join(',')}]`;
+}
+
 ;// CONCATENATED MODULE: ./src/main.ts
+
 
 
 
@@ -37781,9 +37839,9 @@ async function run({ inputs, client, core }) {
     const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel);
     const outputs = {
         'deploy-rate': df.rate(),
-        ...(logging && { 'deploy-rate-log': df.getLog().join('\n') }),
+        ...(logging && { 'deploy-rate-log': serializeLog(df.getLog()) }),
         'lead-time': leadTime,
-        ...(logging && { 'lead-time-log': lt.getLog().join('\n') }),
+        ...(logging && { 'lead-time-log': serializeLog(lt.getLog()) }),
         'change-failure-rate': cfr.Cfr(),
         mttr: mttr.mttr()
     };

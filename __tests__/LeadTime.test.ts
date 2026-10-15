@@ -339,11 +339,7 @@ describe('LeadTime should', () => {
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
     await lt.getLeadTime()
 
-    expect(
-      lt.getLog().filter(l => {
-        return l.includes('release')
-      }).length
-    ).toBe(2)
+    expect(lt.getLog().map(l => l.release)).toEqual(['v0.1.0', 'v1.1.0'])
   })
 
   it('get event log list when lead time calculated', async () => {
@@ -383,11 +379,7 @@ describe('LeadTime should', () => {
 
     const log = lt.getLog()
 
-    expect(
-      log.filter(l => {
-        return l.includes('pull')
-      }).length
-    ).toBe(2)
+    expect(log.filter(l => l.kind === 'pull').length).toBe(2)
   })
 
   it('get event log list when lead time calculated and filtered', async () => {
@@ -427,11 +419,7 @@ describe('LeadTime should', () => {
 
     const log = lt.getLog()
 
-    expect(
-      log.filter(l => {
-        return l.includes('pull')
-      }).length
-    ).toBe(1)
+    expect(log.filter(l => l.kind === 'pull').length).toBe(1)
 
     expect(leadTime).toBe(10)
   })
@@ -473,11 +461,7 @@ describe('LeadTime should', () => {
 
     const log = lt.getLog()
 
-    expect(
-      log.filter(l => {
-        return l.includes('pull')
-      }).length
-    ).toBe(0)
+    expect(log.filter(l => l.kind === 'pull').length).toBe(0)
 
     expect(leadTime).toBe(0)
   })
@@ -524,18 +508,14 @@ describe('LeadTime should', () => {
       expect(lt.getLog()).toEqual([])
     })
 
-    it('write the filtered log line first only when filtered', async () => {
+    it('log only pull records whether filtered or not', async () => {
       const filtered = new LeadTime([mainPull], [repoRelease], adapter, today)
       await filtered.getLeadTime(true)
       const unfiltered = new LeadTime([mainPull], [repoRelease], adapter, today)
       await unfiltered.getLeadTime(false)
 
-      expect(filtered.getLog()[0]).toBe(
-        `\nLog is filtered - only feat and fix.`
-      )
-      expect(unfiltered.getLog()).not.toContain(
-        `\nLog is filtered - only feat and fix.`
-      )
+      expect(filtered.getLog().map(l => l.kind)).toEqual(['pull'])
+      expect(unfiltered.getLog()).toEqual(filtered.getLog())
     })
 
     it('drop unmerged pulls in the constructor', () => {
@@ -573,10 +553,9 @@ describe('LeadTime should', () => {
       const lt = new LeadTime(pulls, [repoRelease], adapter, today)
       await lt.getLeadTime(true)
 
-      const pullLines = lt.getLog().filter(l => l.startsWith('pull->'))
-      expect(pullLines).toEqual([
-        'pull->      2023-04-28T17:50:53Z : fix: real',
-        'pull->      2023-04-28T17:50:53Z : feat: real'
+      expect(lt.getLog().map(l => [l.at, l.title])).toEqual([
+        ['2023-04-28T17:50:53Z', 'fix: real'],
+        ['2023-04-28T17:50:53Z', 'feat: real']
       ])
     })
 
@@ -592,10 +571,16 @@ describe('LeadTime should', () => {
 
       expect(leadTime).toBe(10.74)
       expect(lt.getLog()).toEqual([
-        'pull->      2023-04-28T17:50:53Z : feat: something',
-        '  commit->  2023-04-20T00:00:00Z : first',
-        '  release-> 2023-04-30T17:50:53Z : v1.0.0',
-        '  10.74 days'
+        {
+          kind: 'pull',
+          at: '2023-04-28T17:50:53Z',
+          title: 'feat: something',
+          commitAt: '2023-04-20T00:00:00Z',
+          commitMessage: 'first',
+          releaseAt: '2023-04-30T17:50:53Z',
+          release: 'v1.0.0',
+          leadTimeDays: 10.74
+        }
       ])
     })
   })
