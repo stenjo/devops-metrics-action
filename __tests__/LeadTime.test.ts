@@ -4,12 +4,16 @@ import type {Commit} from '../src/types/Commit'
 import type {PullRequest} from '../src/types/PullRequest'
 import type {Release} from '../src/types/Release'
 import {LeadTime} from '../src/LeadTime'
+import {commit, pull, release, ts} from './helpers/domain'
+
+const DMA = 'stenjo/devops-metrics-action'
+const OTHER = 'stenjo/other-repo'
 
 describe('LeadTime should', () => {
   const commitsAdapter: CommitsAdapter = new CommitsAdapter(new GitHubClient())
   commitsAdapter.getCommitsFromUrl = vi.fn(
     async (): Promise<Commit[] | undefined> => {
-      return Promise.resolve([{}] as Commit[])
+      return Promise.resolve([commit('2023-04-22T17:50:53Z')])
     }
   )
 
@@ -17,7 +21,7 @@ describe('LeadTime should', () => {
     const pulls = [] as PullRequest[]
     const lt = new LeadTime(
       pulls,
-      [{published_at: '2023-04-30T17:50:53Z'}] as Release[],
+      [release('2023-04-30T17:50:53Z')],
       commitsAdapter,
       new Date()
     )
@@ -28,16 +32,12 @@ describe('LeadTime should', () => {
   })
 
   it('return 0 on no closed pull-requests', async () => {
-    const pulls = [
-      {
-        merged_at: ''
-      }
-    ] as PullRequest[]
+    const pulls = [pull({mergedAt: null})]
     const lt = new LeadTime(
       pulls,
-      [{published_at: '2023-04-30T17:50:53Z'}] as Release[],
+      [release('2023-04-30T17:50:53Z')],
       commitsAdapter,
-      new Date()
+      new Date('2023-05-01')
     )
 
     const leadTime = await lt.getLeadTime()
@@ -46,69 +46,35 @@ describe('LeadTime should', () => {
   })
 
   it('return 0 on no releases', async () => {
-    const pulls = [
-      {
-        merged_at: '2023-04-28T17:50:53Z', // 30-22 = 8
-        base: {ref: 'main'}
-      }
-    ] as PullRequest[]
+    const pulls = [pull({mergedAt: ts('2023-04-28T17:50:53Z')})]
 
-    const lt = new LeadTime(pulls, [], commitsAdapter, new Date())
+    const lt = new LeadTime(pulls, [], commitsAdapter, new Date('2023-05-01'))
 
     const leadTime = await lt.getLeadTime()
 
     expect(leadTime).toBe(0)
   })
 
-  it('return 0 on no pull-requests with base.ref = main', async () => {
-    const pulls = [
-      {
-        merged_at: '2023-04-29T17:50:53Z',
-        base: {
-          ref: 'other'
-        }
-      }
-    ] as PullRequest[]
-    const lt = new LeadTime(pulls, [], commitsAdapter, new Date())
+  it('return 0 on no pull-requests with baseRef = main', async () => {
+    const pulls = [pull({baseRef: 'other'})]
+    const lt = new LeadTime(
+      pulls,
+      [release('2023-04-30T17:50:53Z')],
+      commitsAdapter,
+      new Date('2023-05-01')
+    )
 
     const leadTime = await lt.getLeadTime()
 
     expect(leadTime).toBe(0)
   })
 
-  it('return 0 on 1 pullrequest with no commits', async () => {
-    const pulls = [] as PullRequest[]
-    const lt = new LeadTime(pulls, [], commitsAdapter, new Date())
-
-    const leadTime = await lt.getLeadTime()
-
-    expect(leadTime).toBe(0)
-  })
-
-  it('return 8 on pull-requests with base.ref = main', async () => {
-    const pullRequests = [
-      {
-        merged_at: '2023-04-28T17:50:53Z', // 30-22 = 8
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      }
-    ] as PullRequest[]
-    const releases = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-30T17:50:53Z'
-      }
-    ] as Release[]
+  it('return 8 on pull-requests with baseRef = main', async () => {
+    const pullRequests = [pull({mergedAt: ts('2023-04-28T17:50:53Z')})] // 30-22 = 8
+    const releases = [release('2023-04-30T17:50:53Z')]
     commitsAdapter.getCommitsFromUrl = vi.fn(
       async (): Promise<Commit[] | undefined> => {
-        return Promise.resolve([
-          {
-            commit: {
-              committer: {
-                date: '2023-04-22T17:50:53Z'
-              }
-            }
-          }
-        ] as Commit[])
+        return Promise.resolve([commit('2023-04-22T17:50:53Z')])
       }
     )
     const lt = new LeadTime(
@@ -123,29 +89,20 @@ describe('LeadTime should', () => {
     expect(leadTime).toBe(8)
   })
 
-  it('return 8 on pull-requests with base.ref = main and earlier release on other repo', async () => {
+  it('return 8 on pull-requests with baseRef = main and earlier release on other repo', async () => {
     const pullRequests = [
-      {
-        merged_at: '2023-04-28T17:50:53Z', // 30-22 = 8
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
-        commits_url: 'path/to/commits/1'
-      }
-    ] as PullRequest[]
+      pull({
+        mergedAt: ts('2023-04-28T17:50:53Z'),
+        commitsUrl: 'path/to/commits/1'
+      }) // 30-22 = 8
+    ]
     const releases = [
-      {
-        url: 'https://api.github.com/repos/stenjo/other-repo/releases/101411508',
-        published_at: '2023-04-29T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-30T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-29T17:50:53Z', OTHER),
+      release('2023-04-30T17:50:53Z', DMA)
+    ]
     commitsAdapter.getCommitsFromUrl = vi.fn(
       async (): Promise<Commit[] | undefined> => {
-        return Promise.resolve([
-          {commit: {committer: {date: '2023-04-22T17:50:53Z'}}}
-        ] as Commit[])
+        return Promise.resolve([commit('2023-04-22T17:50:53Z')])
       }
     )
     const lt = new LeadTime(
@@ -167,31 +124,8 @@ describe('LeadTime should', () => {
   })
 
   it('return 0 on too old pull-requests', async () => {
-    const pulls = [
-      {
-        merged_at: '2023-04-29T17:50:53Z',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      }
-    ] as PullRequest[]
-    const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-30T17:50:53Z'
-      }
-    ] as Release[]
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (): Promise<Commit[] | undefined> => {
-        return Promise.resolve([
-          {
-            commit: {
-              committer: {
-                date: '2023-04-22T17:50:53Z'
-              }
-            }
-          }
-        ] as Commit[])
-      }
-    )
+    const pulls = [pull({mergedAt: ts('2023-04-29T17:50:53Z')})]
+    const rels = [release('2023-04-30T17:50:53Z')]
     const lt = new LeadTime(
       pulls,
       rels,
@@ -203,25 +137,16 @@ describe('LeadTime should', () => {
 
     expect(leadTime).toBe(0)
   })
+
   it('return 11 on pull-requests with two commits', async () => {
-    const pulls = [
-      {
-        merged_at: '2023-04-29T17:50:53Z', // 30-19 = 11
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      }
-    ] as PullRequest[]
-    const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-30T17:50:53Z'
-      }
-    ] as Release[]
+    const pulls = [pull({mergedAt: ts('2023-04-29T17:50:53Z')})] // 30-19 = 11
+    const rels = [release('2023-04-30T17:50:53Z')]
     commitsAdapter.getCommitsFromUrl = vi.fn(
       async (): Promise<Commit[] | undefined> => {
         return Promise.resolve([
-          {commit: {committer: {date: '2023-04-22T17:50:53Z'}}},
-          {commit: {committer: {date: '2023-04-19T17:50:53Z'}}}
-        ] as Commit[])
+          commit('2023-04-22T17:50:53Z'),
+          commit('2023-04-19T17:50:53Z')
+        ])
       }
     )
 
@@ -234,31 +159,19 @@ describe('LeadTime should', () => {
 
   it('return 10.5 on pull-requests with two pulls on different repos', async () => {
     const pulls = [
-      {
-        merged_at: '2023-04-29T17:50:53Z', // 30-19 = 11
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      },
-      {
-        merged_at: '2023-04-28T17:50:53Z', // 29-19 = 10
-        base: {ref: 'main', repo: {name: 'other-repo'}}
-      }
-    ] as PullRequest[]
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), repo: DMA}), // 30-19 = 11
+      pull({mergedAt: ts('2023-04-28T17:50:53Z'), repo: OTHER}) // 29-19 = 10
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-30T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/other-repo/releases/101411508',
-        published_at: '2023-04-29T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-30T17:50:53Z', DMA),
+      release('2023-04-29T17:50:53Z', OTHER)
+    ]
     commitsAdapter.getCommitsFromUrl = vi.fn(
       async (): Promise<Commit[] | undefined> => {
         return Promise.resolve([
-          {commit: {committer: {date: '2023-04-22T17:50:53Z'}}},
-          {commit: {committer: {date: '2023-04-19T17:50:53Z'}}}
-        ] as Commit[])
+          commit('2023-04-22T17:50:53Z'),
+          commit('2023-04-19T17:50:53Z')
+        ])
       }
     )
 
@@ -275,34 +188,16 @@ describe('LeadTime should', () => {
         return Promise.resolve(getCommits(url))
       }
     )
-    // getCommits()
     // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
     const pulls = [
-      {
-        merged_at: '2023-04-29T17:50:53Z', // 30-19 = 11
-        commits_url: '47',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      },
-      {
-        merged_at: '2023-04-27T17:50:53Z', // 28-22 = 6
-        commits_url: '10',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      }
-    ] as PullRequest[]
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '47'}), // 30-19 = 11
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10'}) // 28-22 = 6
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-28T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-30T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-02T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-28T17:50:53Z'),
+      release('2023-04-30T17:50:53Z'),
+      release('2023-04-02T17:50:53Z')
+    ]
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
 
     const leadTime = await lt.getLeadTime()
@@ -316,41 +211,17 @@ describe('LeadTime should', () => {
         return Promise.resolve(getCommits(url))
       }
     )
-    // getCommits()
     // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
-
     const pulls = [
-      {
-        merged_at: '2023-04-29T17:50:53Z', // Has a commit 19/4, first release is 30/4 -> Lead time 11 days
-        commits_url: '47',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      },
-      {
-        merged_at: '2023-04-27T17:50:53Z', //  Has a commit 22/4, first release is 28/4 -> Lead time 6 days
-        commits_url: '10',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      },
-      {
-        merged_at: '2023-04-29T17:50:53Z', //  Has a commit 27/4, first release is 30/4 -> Lead time 3 days
-        commits_url: '15',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      }
-    ] as PullRequest[]
-
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '47'}), // commit 19/4, release 30/4 -> 11 days
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10'}), // commit 22/4, release 28/4 -> 6 days
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '15'}) // commit 27/4, release 30/4 -> 3 days
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-28T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-30T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-02T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-28T17:50:53Z'),
+      release('2023-04-30T17:50:53Z'),
+      release('2023-04-02T17:50:53Z')
+    ]
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
 
@@ -365,37 +236,15 @@ describe('LeadTime should', () => {
         return Promise.resolve(getCommits(url))
       }
     )
-    // getCommits()
-    // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
-
     const pulls = [
-      {
-        merged_at: '2023-04-29T17:50:53Z', // Has a commit 19/4, first release is 30/4 -> Lead time 11 days
-        commits_url: '47',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      },
-      {
-        merged_at: '2023-04-27T17:50:53Z', //  Has a commit 22/4, first release is 28/4 -> Lead time 6 days
-        commits_url: '10',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      },
-      {
-        merged_at: '2023-04-29T17:50:53Z', //  Has a commit 27/4, first release is 30/4 -> Lead time 3 days
-        commits_url: '15',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      }
-    ] as PullRequest[]
-
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '47'}),
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10'}), // commit 22/4, release 28/4 -> 6 days
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '15'})
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-28T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-02T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-28T17:50:53Z'),
+      release('2023-04-02T17:50:53Z')
+    ]
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
 
@@ -410,47 +259,54 @@ describe('LeadTime should', () => {
         return Promise.resolve(getCommits(url))
       }
     )
-    // getCommits()
-    // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
-
     const pulls = [
-      {
-        merged_at: '2023-04-27T17:50:53Z', // Has a commit 19/4, first release is 29/4 -> Lead time 10 days
-        commits_url: '47',
-        base: {ref: 'main', repo: {name: 'other-repo'}}
-      },
-      {
-        merged_at: '2023-04-27T17:50:53Z', //  Has a commit 22/4, first release is 28/4 -> Lead time 6 days
-        commits_url: '10',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      },
-      {
-        merged_at: '2023-04-29T17:50:53Z', //  Has a commit 27/4, first release is 30/4 -> Lead time 3 days
-        commits_url: '15',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      }
-    ] as PullRequest[]
-
+      pull({
+        mergedAt: ts('2023-04-27T17:50:53Z'),
+        commitsUrl: '47',
+        repo: OTHER
+      }), // commit 19/4, release 29/4 -> 10 days
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10', repo: DMA}), // commit 22/4, release 28/4 -> 6 days
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '15', repo: DMA}) // not released
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-28T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/other-repo/releases/101411508',
-        published_at: '2023-04-29T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        published_at: '2023-04-02T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-28T17:50:53Z', DMA),
+      release('2023-04-29T17:50:53Z', OTHER),
+      release('2023-04-02T17:50:53Z', DMA)
+    ]
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
 
     const leadTime = await lt.getLeadTime()
 
     expect(leadTime).toBe(8) // (6+10)/2
+  })
+
+  it('not attribute releases of a repo whose name is a prefix of another', async () => {
+    commitsAdapter.getCommitsFromUrl = vi.fn(async (): Promise<Commit[]> => [
+      commit('2023-04-22T17:50:53Z')
+    ])
+    const pulls = [pull({mergedAt: ts('2023-04-28T17:50:53Z'), repo: 'o/api'})]
+    const onlyGateway = [release('2023-04-30T17:50:53Z', 'o/api-gateway')]
+    const both = [
+      release('2023-04-29T17:50:53Z', 'o/api-gateway'),
+      release('2023-05-01T17:50:53Z', 'o/api')
+    ]
+
+    const unreleased = new LeadTime(
+      pulls,
+      onlyGateway,
+      commitsAdapter,
+      new Date('2023-05-02')
+    )
+    const released = new LeadTime(
+      pulls,
+      both,
+      commitsAdapter,
+      new Date('2023-05-02')
+    )
+
+    expect(await unreleased.getLeadTime()).toBe(0)
+    expect(await released.getLeadTime()).toBe(9) // 1/5 - 22/4, not 29/4
   })
 
   it('get an empty log of releases or pulls', async () => {
@@ -465,44 +321,20 @@ describe('LeadTime should', () => {
         return Promise.resolve(getCommits(url))
       }
     )
-    // getCommits()
-    // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
-
     const pulls = [
-      {
-        merged_at: '2023-04-27T17:50:53Z', // Has a commit 19/4, first release is 29/4 -> Lead time 10 days
-        commits_url: '47',
-        base: {ref: 'main', repo: {name: 'other-repo'}}
-      },
-      {
-        merged_at: '2023-04-27T17:50:53Z', //  Has a commit 22/4, first release is 28/4 -> Lead time 6 days
-        commits_url: '10',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      },
-      {
-        merged_at: '2023-04-29T17:50:53Z', //  Has a commit 27/4, first release is 30/4 -> Lead time 3 days
-        commits_url: '15',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}}
-      }
-    ] as PullRequest[]
-
+      pull({
+        mergedAt: ts('2023-04-27T17:50:53Z'),
+        commitsUrl: '47',
+        repo: OTHER
+      }),
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10', repo: DMA}),
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '15', repo: DMA})
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        name: 'v1.1.0',
-        published_at: '2023-04-28T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/other-repo/releases/101411508',
-        name: 'v0.1.0',
-        published_at: '2023-04-29T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        name: 'v0.0.1',
-        published_at: '2023-04-02T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-28T17:50:53Z', DMA, 'v1.1.0'),
+      release('2023-04-29T17:50:53Z', OTHER, 'v0.1.0'),
+      release('2023-04-02T17:50:53Z', DMA, 'v0.0.1')
+    ]
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
     await lt.getLeadTime()
@@ -513,60 +345,43 @@ describe('LeadTime should', () => {
       }).length
     ).toBe(2)
   })
+
   it('get event log list when lead time calculated', async () => {
     commitsAdapter.getCommitsFromUrl = vi.fn(
       async (url: string): Promise<Commit[] | undefined> => {
         return Promise.resolve(getCommits(url))
       }
     )
-    // getCommits()
-    // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
-
     const pulls = [
-      {
-        merged_at: '2023-04-27T17:50:53Z', // Has a commit 19/4, first release is 29/4 -> Lead time 10 days
-        commits_url: '47',
-        base: {ref: 'main', repo: {name: 'other-repo'}},
+      pull({
+        mergedAt: ts('2023-04-27T17:50:53Z'),
+        commitsUrl: '47',
+        repo: OTHER,
         title: 'feat(docs): better description'
-      },
-      {
-        merged_at: '2023-04-27T17:50:53Z', //  Has a commit 22/4, first release is 28/4 -> Lead time 6 days
-        commits_url: '10',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
+      }),
+      pull({
+        mergedAt: ts('2023-04-27T17:50:53Z'),
+        commitsUrl: '10',
+        repo: DMA,
         title: 'fix: removed error message'
-      },
-      {
-        merged_at: '2023-04-29T17:50:53Z', //  Has a commit 27/4, first release is 30/4 -> Lead time 3 days
-        commits_url: '15',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
+      }),
+      pull({
+        mergedAt: ts('2023-04-29T17:50:53Z'),
+        commitsUrl: '15',
+        repo: DMA,
         title: 'feat: handle several repos'
-      }
-    ] as PullRequest[]
-
+      })
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        name: 'v1.1.0',
-        published_at: '2023-04-28T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/other-repo/releases/101411508',
-        name: 'v0.1.0',
-        published_at: '2023-04-29T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        name: 'v0.0.1',
-        published_at: '2023-04-02T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-28T17:50:53Z', DMA, 'v1.1.0'),
+      release('2023-04-29T17:50:53Z', OTHER, 'v0.1.0'),
+      release('2023-04-02T17:50:53Z', DMA, 'v0.0.1')
+    ]
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
     await lt.getLeadTime()
 
     const log = lt.getLog()
-
-    // console.log(log)
 
     expect(
       log.filter(l => {
@@ -581,47 +396,31 @@ describe('LeadTime should', () => {
         return Promise.resolve(getCommits(url))
       }
     )
-    // getCommits()
-    // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
-
     const pulls = [
-      {
-        merged_at: '2023-04-27T17:50:53Z', // Has a commit 19/4, first release is 29/4 -> Lead time 10 days
-        commits_url: '47',
-        base: {ref: 'main', repo: {name: 'other-repo'}},
+      pull({
+        mergedAt: ts('2023-04-27T17:50:53Z'),
+        commitsUrl: '47',
+        repo: OTHER,
         title: 'feat(docs): better description'
-      },
-      {
-        merged_at: '2023-04-27T17:50:53Z', //  Has a commit 22/4, first release is 28/4 -> Lead time 6 days
-        commits_url: '10',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
+      }),
+      pull({
+        mergedAt: ts('2023-04-27T17:50:53Z'),
+        commitsUrl: '10',
+        repo: DMA,
         title: 'chore: cleaned up'
-      },
-      {
-        merged_at: '2023-04-29T17:50:53Z', //  Has a commit 27/4, first release is 30/4 -> Lead time 3 days
-        commits_url: '15',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
+      }),
+      pull({
+        mergedAt: ts('2023-04-29T17:50:53Z'),
+        commitsUrl: '15',
+        repo: DMA,
         title: 'fix: removed error message'
-      }
-    ] as PullRequest[]
-
+      })
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        name: 'v1.1.0',
-        published_at: '2023-04-28T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/other-repo/releases/101411508',
-        name: 'v0.1.0',
-        published_at: '2023-04-29T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        name: 'v0.0.1',
-        published_at: '2023-04-02T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-28T17:50:53Z', DMA, 'v1.1.0'),
+      release('2023-04-29T17:50:53Z', OTHER, 'v0.1.0'),
+      release('2023-04-02T17:50:53Z', DMA, 'v0.0.1')
+    ]
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
     const leadTime = await lt.getLeadTime(true)
@@ -643,47 +442,31 @@ describe('LeadTime should', () => {
         return Promise.resolve(getCommits(url))
       }
     )
-    // getCommits()
-    // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
-
     const pulls = [
-      {
-        merged_at: '2023-04-27T17:50:53Z', // Has a commit 19/4, first release is 29/4 -> Lead time 10 days
-        commits_url: '47',
-        base: {ref: 'main', repo: {name: 'other-repo'}},
+      pull({
+        mergedAt: ts('2023-04-27T17:50:53Z'),
+        commitsUrl: '47',
+        repo: OTHER,
         title: 'chore(docs): better description'
-      },
-      {
-        merged_at: '2023-04-27T17:50:53Z', //  Has a commit 22/4, first release is 28/4 -> Lead time 6 days
-        commits_url: '10',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
+      }),
+      pull({
+        mergedAt: ts('2023-04-27T17:50:53Z'),
+        commitsUrl: '10',
+        repo: DMA,
         title: 'chore: cleaned up'
-      },
-      {
-        merged_at: '2023-04-29T17:50:53Z', //  Has a commit 27/4, first release is 30/4 -> Lead time 3 days
-        commits_url: '15',
-        base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
+      }),
+      pull({
+        mergedAt: ts('2023-04-29T17:50:53Z'),
+        commitsUrl: '15',
+        repo: DMA,
         title: 'ci: removed error message'
-      }
-    ] as PullRequest[]
-
+      })
+    ]
     const rels = [
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        name: 'v1.1.0',
-        published_at: '2023-04-28T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/other-repo/releases/101411508',
-        name: 'v0.1.0',
-        published_at: '2023-04-29T17:50:53Z'
-      },
-      {
-        url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/101411508',
-        name: 'v0.0.1',
-        published_at: '2023-04-02T17:50:53Z'
-      }
-    ] as Release[]
+      release('2023-04-28T17:50:53Z', DMA, 'v1.1.0'),
+      release('2023-04-29T17:50:53Z', OTHER, 'v0.1.0'),
+      release('2023-04-02T17:50:53Z', DMA, 'v0.0.1')
+    ]
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
     const leadTime = await lt.getLeadTime(true)
@@ -700,27 +483,20 @@ describe('LeadTime should', () => {
   })
 
   describe('edge cases', () => {
-    const repoRelease = {
-      url: 'https://api.github.com/repos/stenjo/devops-metrics-action/releases/1',
-      name: 'v1.0.0',
-      published_at: '2023-04-30T17:50:53Z'
-    } as Release
+    const repoRelease: Release = release('2023-04-30T17:50:53Z', DMA, 'v1.0.0')
     const today = new Date('2023-05-01T00:00:00Z')
-    const mainPull = {
-      merged_at: '2023-04-28T17:50:53Z',
-      commits_url: '47',
-      base: {ref: 'main', repo: {name: 'devops-metrics-action'}},
+    const mainPull = pull({
+      mergedAt: ts('2023-04-28T17:50:53Z'),
+      commitsUrl: '47',
       title: 'feat: something'
-    } as PullRequest
+    })
     const adapter: CommitsAdapter = new CommitsAdapter(new GitHubClient())
     adapter.getCommitsFromUrl = vi.fn(
       async (url: string): Promise<Commit[] | undefined> => getCommits(url)
     )
 
     it('exclude a pull merged exactly 31 days ago', async () => {
-      const pulls = [
-        {...mainPull, merged_at: '2023-03-31T00:00:00Z'}
-      ] as PullRequest[]
+      const pulls = [{...mainPull, mergedAt: ts('2023-03-31T00:00:00Z')}]
       const lt = new LeadTime(pulls, [repoRelease], adapter, today)
 
       expect(await lt.getLeadTime()).toBe(0)
@@ -728,9 +504,7 @@ describe('LeadTime should', () => {
     })
 
     it('include a pull merged just under 31 days ago', async () => {
-      const pulls = [
-        {...mainPull, merged_at: '2023-03-31T00:00:01Z'}
-      ] as PullRequest[]
+      const pulls = [{...mainPull, mergedAt: ts('2023-03-31T00:00:01Z')}]
       const lt = new LeadTime(pulls, [repoRelease], adapter, today)
 
       expect(await lt.getLeadTime()).toBeGreaterThan(0)
@@ -764,49 +538,27 @@ describe('LeadTime should', () => {
       )
     })
 
-    it('ignore a pull whose merged_at is not a string', async () => {
-      const pulls = [
-        {...mainPull, merged_at: +new Date('2023-04-28T17:50:53Z')}
-      ] as unknown as PullRequest[]
-      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+    it('drop unmerged pulls in the constructor', () => {
+      const lt = new LeadTime(
+        [mainPull, {...mainPull, mergedAt: null}],
+        [repoRelease],
+        adapter,
+        today
+      )
 
-      expect(await lt.getLeadTime()).toBe(0)
-    })
-
-    it('ignore a pull whose repo name is empty', async () => {
-      const pulls = [
-        {...mainPull, base: {ref: 'main', repo: {name: ''}}}
-      ] as PullRequest[]
-      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
-
-      expect(await lt.getLeadTime()).toBe(0)
-    })
-
-    it('ignore a pull whose repo name is not a string', async () => {
-      const pulls = [
-        {...mainPull, base: {ref: 'main', repo: {name: 1}}}
-      ] as unknown as PullRequest[]
-      const release = {...repoRelease, url: 'https://x/repos/o/1/releases/1'}
-      const lt = new LeadTime(pulls, [release], adapter, today)
-
-      expect(await lt.getLeadTime()).toBe(0)
+      expect(lt.pulls).toEqual([mainPull])
     })
 
     it('ignore a pull not merged to main even when releases exist', async () => {
-      const pulls = [
-        {
-          ...mainPull,
-          base: {ref: 'develop', repo: {name: 'devops-metrics-action'}}
-        }
-      ] as PullRequest[]
+      const pulls = [{...mainPull, baseRef: 'develop'}]
       const lt = new LeadTime(pulls, [repoRelease], adapter, today)
 
       expect(await lt.getLeadTime()).toBe(0)
     })
 
     it('ignore a release published at the exact merge time', async () => {
-      const release = {...repoRelease, published_at: mainPull.merged_at}
-      const lt = new LeadTime([mainPull], [release], adapter, today)
+      const rel = {...repoRelease, publishedAt: mainPull.mergedAt as number}
+      const lt = new LeadTime([mainPull], [rel], adapter, today)
 
       expect(await lt.getLeadTime()).toBe(0)
     })
@@ -817,7 +569,7 @@ describe('LeadTime should', () => {
         {...mainPull, title: 'fix: real'},
         {...mainPull, title: 'feat: real'},
         {...mainPull, title: 'refactor: feat'}
-      ] as PullRequest[]
+      ]
       const lt = new LeadTime(pulls, [repoRelease], adapter, today)
       await lt.getLeadTime(true)
 
@@ -829,29 +581,11 @@ describe('LeadTime should', () => {
     })
 
     it('log the earliest commit even when commits are unsorted', async () => {
-      adapter.getCommitsFromUrl = vi.fn(
-        async (): Promise<Commit[]> =>
-          [
-            {
-              commit: {
-                committer: {date: '2023-04-25T00:00:00Z'},
-                message: 'later'
-              }
-            },
-            {
-              commit: {
-                committer: {date: '2023-04-20T00:00:00Z'},
-                message: 'first'
-              }
-            },
-            {
-              commit: {
-                committer: {date: '2023-04-22T00:00:00Z'},
-                message: 'middle'
-              }
-            }
-          ] as Commit[]
-      )
+      adapter.getCommitsFromUrl = vi.fn(async (): Promise<Commit[]> => [
+        commit('2023-04-25T00:00:00Z', 'later'),
+        commit('2023-04-20T00:00:00Z', 'first'),
+        commit('2023-04-22T00:00:00Z', 'middle')
+      ])
       const lt = new LeadTime([mainPull], [repoRelease], adapter, today)
 
       const leadTime = await lt.getLeadTime()
@@ -869,40 +603,18 @@ describe('LeadTime should', () => {
   // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
   async function getCommits(url: string): Promise<Commit[]> {
     if (url === '10') {
-      return [
-        {
-          commit: {
-            committer: {
-              date: '2023-04-22T17:50:53Z'
-            },
-            message: 'wip: changed to commonjs'
-          }
-        }
-      ] as Commit[]
+      return [commit('2023-04-22T17:50:53Z', 'wip: changed to commonjs')]
     }
     if (url === '15') {
       return [
-        {
-          commit: {
-            committer: {
-              date: '2023-04-27T17:50:53Z'
-            },
-            message: 'fix(workflow): update release and dora workflows'
-          }
-        }
-      ] as Commit[]
+        commit(
+          '2023-04-27T17:50:53Z',
+          'fix(workflow): update release and dora workflows'
+        )
+      ]
     }
     if (url === '47') {
-      return [
-        {
-          commit: {
-            committer: {
-              date: '2023-04-19T17:50:53Z'
-            },
-            message: 'all passing'
-          }
-        }
-      ] as Commit[]
+      return [commit('2023-04-19T17:50:53Z', 'all passing')]
     }
     return []
   }

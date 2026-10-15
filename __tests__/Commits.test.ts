@@ -1,6 +1,7 @@
 import {CommitsAdapter} from '../src/CommitsAdapter'
 import {GitHubClient} from '../src/GitHubClient'
 import type {Commit} from '../src/types/Commit'
+import type {GitHubCommitPayload} from '../src/github/payloads'
 import fs from 'node:fs'
 import * as dotenv from 'dotenv'
 
@@ -10,10 +11,10 @@ test('fetches commits', async () => {
   const client = new GitHubClient({token: process.env.GH_TOKEN})
   const adapter = new CommitsAdapter(client)
   vi.spyOn(client, 'request').mockImplementation(
-    async (): Promise<Commit[]> =>
+    async (): Promise<GitHubCommitPayload[]> =>
       JSON.parse(
         fs.readFileSync('./__tests__/test-data/commits.json').toString()
-      ) as Commit[]
+      ) as GitHubCommitPayload[]
   )
 
   const cl = (await adapter.getCommitsFromUrl('10')) as Commit[]

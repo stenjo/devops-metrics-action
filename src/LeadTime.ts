@@ -1,18 +1,16 @@
-import {PullRequest} from './types/PullRequest'
-import {Release} from './types/Release'
-import {ICommitsAdapter} from './interfaces/ICommitsAdapter'
-import {Commit} from './types/Commit'
+import type {PullRequest} from './types/PullRequest'
+import type {Release} from './types/Release'
+import type {ICommitsAdapter} from './interfaces/ICommitsAdapter'
+import type {Commit} from './types/Commit'
+import {isoTimestamp} from './types/Timestamp'
+
+type MergedPullRequest = PullRequest & {mergedAt: number}
 
 const ONE_DAY = 24 * 60 * 60 * 1000
 export class LeadTime {
   log: string[] = []
-  pulls: PullRequest[]
-  releases: {
-    published: number
-    url: string
-    name: string
-    published_at: string
-  }[]
+  pulls: MergedPullRequest[]
+  releases: Release[]
   today: Date
   commitsAdapter: ICommitsAdapter
 
@@ -28,17 +26,11 @@ export class LeadTime {
       this.today = today
     }
 
+    const since = this.today.valueOf() - 31 * ONE_DAY
     this.pulls = pulls.filter(
-      p => +new Date(p.merged_at) > this.today.valueOf() - 31 * ONE_DAY
+      (p): p is MergedPullRequest => p.mergedAt !== null && p.mergedAt > since
     )
-    this.releases = releases.map(r => {
-      return {
-        published: +new Date(r.published_at),
-        url: r.url,
-        name: r.name,
-        published_at: r.published_at
-      }
-    })
+    this.releases = releases
     this.commitsAdapter = commitsAdapter
   }
 
@@ -56,52 +48,42 @@ export class LeadTime {
 
     const leadTimes: number[] = []
     for (const pull of this.pulls) {
-      if (
-        typeof pull.merged_at === 'string' &&
-        pull.merged_at &&
-        typeof pull.base.repo.name === 'string' &&
-        pull.base.repo.name &&
-        pull.base.ref === 'main'
-      ) {
-        if (
-          filtered &&
-          !(pull.title.startsWith('feat') || pull.title.startsWith('fix'))
-        ) {
-          continue
-        }
-
-        const mergeTime = +new Date(pull.merged_at)
-        const laterReleases = this.releases.filter(
-          r => r.published > mergeTime && r.url.includes(pull.base.repo.name)
-        )
-        if (laterReleases.length === 0) {
-          continue
-        }
-        const deployTime: number = laterReleases[0].published
-        this.log.push(`pull->      ${pull.merged_at} : ${pull.title}`)
-        const commits = (await this.commitsAdapter.getCommitsFromUrl(
-          pull.commits_url
-        )) as Commit[]
-        const commitTime: number = commits
-          .map(c => +new Date(c.commit.committer.date))
-          .sort((a, b) => a - b)[0]
-        const firstCommit = commits.sort((a, b) => {
-          return (
-            +new Date(a.commit.committer.date) -
-            +new Date(b.commit.committer.date)
-          )
-        })[0]
-        this.log.push(
-          `  commit->  ${firstCommit.commit.committer.date} : ${firstCommit.commit.message}`
-        )
-        this.log.push(
-          `  release-> ${laterReleases[0].published_at} : ${laterReleases[0].name}`
-        )
-
-        const leadTime = (deployTime - commitTime) / ONE_DAY
-        leadTimes.push(leadTime)
-        this.log.push(`  ${leadTime.toFixed(2)} days`)
+      if (pull.baseRef !== 'main') {
+        continue
       }
+      if (
+        filtered &&
+        !(pull.title.startsWith('feat') || pull.title.startsWith('fix'))
+      ) {
+        continue
+      }
+
+      const laterReleases = this.releases.filter(
+        r => r.publishedAt > pull.mergedAt && r.repo === pull.repo
+      )
+      if (laterReleases.length === 0) {
+        continue
+      }
+      const deployTime: number = laterReleases[0].publishedAt
+      this.log.push(
+        `pull->      ${isoTimestamp(pull.mergedAt)} : ${pull.title}`
+      )
+      const commits = (await this.commitsAdapter.getCommitsFromUrl(
+        pull.commitsUrl
+      )) as Commit[]
+      const firstCommit = commits.sort(
+        (a, b) => a.committedAt - b.committedAt
+      )[0]
+      this.log.push(
+        `  commit->  ${isoTimestamp(firstCommit.committedAt)} : ${firstCommit.message}`
+      )
+      this.log.push(
+        `  release-> ${isoTimestamp(laterReleases[0].publishedAt)} : ${laterReleases[0].name}`
+      )
+
+      const leadTime = (deployTime - firstCommit.committedAt) / ONE_DAY
+      leadTimes.push(leadTime)
+      this.log.push(`  ${leadTime.toFixed(2)} days`)
     }
     if (leadTimes.length === 0) {
       return 0

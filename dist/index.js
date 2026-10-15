@@ -37301,7 +37301,46 @@ class GitHubClient {
     }
 }
 
+;// CONCATENATED MODULE: ./src/github/mappers.ts
+function repoKey(owner, repo) {
+    return `${owner.toLowerCase()}/${repo.toLowerCase()}`;
+}
+function timestamp(value) {
+    return value ? +new Date(value) : null;
+}
+function toRelease(owner, repo, payload) {
+    return {
+        repo: repoKey(owner, repo),
+        name: payload.name,
+        publishedAt: +new Date(payload.published_at)
+    };
+}
+function toPullRequest(owner, repo, payload) {
+    return {
+        repo: repoKey(owner, repo),
+        title: payload.title,
+        mergedAt: timestamp(payload.merged_at),
+        baseRef: payload.base.ref,
+        commitsUrl: payload.commits_url
+    };
+}
+function toIssue(owner, repo, payload) {
+    return {
+        repo: repoKey(owner, repo),
+        createdAt: +new Date(payload.created_at),
+        closedAt: timestamp(payload.closed_at),
+        labels: payload.labels.map(label => label.name)
+    };
+}
+function toCommit(payload) {
+    return {
+        committedAt: +new Date(payload.commit.committer.date),
+        message: payload.commit.message
+    };
+}
+
 ;// CONCATENATED MODULE: ./src/ReleaseAdapter.ts
+
 
 class ReleaseAdapter {
     client;
@@ -37319,7 +37358,8 @@ class ReleaseAdapter {
         try {
             let result = [];
             for (const repo of this.repositories) {
-                result = result.concat(await this.client.paginate('GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() }));
+                const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+                result = result.concat(payloads.map(payload => toRelease(this.owner, repo, payload)));
             }
             return result;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37330,8 +37370,15 @@ class ReleaseAdapter {
     }
 }
 
+;// CONCATENATED MODULE: ./src/types/Timestamp.ts
+// Epoch milliseconds rendered the way GitHub does: second precision, Z suffix.
+function isoTimestamp(ms) {
+    return `${new Date(ms).toISOString().slice(0, 19)}Z`;
+}
+
 ;// CONCATENATED MODULE: ./src/DeployFrequency.ts
 //
+
 // The number of milliseconds in one day
 const ONE_DAY = 1000 * 60 * 60 * 24;
 class DeployFrequency {
@@ -37353,9 +37400,9 @@ class DeployFrequency {
     weekly() {
         let releaseCount = 0;
         for (const release of this.rList) {
-            const relDate = new Date(release.published_at);
+            const relDate = new Date(release.publishedAt);
             if (this.days_between(this.today, relDate) < 8) {
-                this.log.push(`release->  ${release.name}:${release.published_at}`);
+                this.log.push(`release->  ${release.name}:${isoTimestamp(release.publishedAt)}`);
                 releaseCount++;
             }
         }
@@ -37364,9 +37411,9 @@ class DeployFrequency {
     monthly() {
         let releaseCount = 0;
         for (const release of this.rList) {
-            const relDate = new Date(release.published_at);
+            const relDate = new Date(release.publishedAt);
             if (this.days_between(this.today, relDate) < 31) {
-                this.log.push(`release->  ${release.name}:${release.published_at}`);
+                this.log.push(`release->  ${release.name}:${isoTimestamp(release.publishedAt)}`);
                 releaseCount++;
             }
         }
@@ -37395,15 +37442,14 @@ class ChangeFailureRate {
         this.issues = issues;
         this.bugLabel = bugLabel;
         this.releases = releases
-            .sort((a, b) => +new Date(a.published_at) < +new Date(b.published_at) ? -1 : 1)
-            .filter(r => +new Date(r.published_at) >
-            this.today.valueOf() - 31 * 24 * 60 * 60 * 1000);
+            .sort((a, b) => (a.publishedAt < b.publishedAt ? -1 : 1))
+            .filter(r => r.publishedAt > this.today.valueOf() - 31 * 24 * 60 * 60 * 1000);
         this.repos = [];
     }
     getBugs() {
         const bugs = [];
         for (const issue of this.issues) {
-            if (issue.labels.filter(label => label.name === this.bugLabel).length > 0) {
+            if (issue.labels.includes(this.bugLabel)) {
                 bugs.push(issue);
             }
         }
@@ -37415,30 +37461,23 @@ class ChangeFailureRate {
         }
         const bugs = this.getBugs();
         for (const bug of bugs) {
-            const repo = bug.repository_url.split('/').reverse()[0];
-            if (!this.repos.includes(repo)) {
-                this.repos.push(repo);
+            if (!this.repos.includes(bug.repo)) {
+                this.repos.push(bug.repo);
             }
         }
-        // const bugDates = this.getBugs().map(issue => +new Date(issue.created_at))
-        const releaseDates = this.releases.map(function (release) {
-            return { published: +new Date(release.published_at), url: release.url };
+        const releaseDates = this.releases.map(release => {
+            return { published: release.publishedAt, repo: release.repo };
         });
         for (const repo of this.repos) {
-            releaseDates.push({ published: Date.now(), url: repo });
+            releaseDates.push({ published: Date.now(), repo });
         }
         let failedDeploys = 0;
         for (const repo of this.repos) {
-            const releasesForRepo = releaseDates.filter(r => r.url.includes(repo));
+            const releasesForRepo = releaseDates.filter(r => r.repo === repo);
             for (let i = 0; i < releasesForRepo.length - 1; i++) {
-                if (bugs.filter(function (bug) {
-                    if (bug.repository_url.split('/').reverse()[0] !== repo) {
-                        return false;
-                    }
-                    const bugDate = +new Date(bug.created_at);
-                    return (bugDate > releasesForRepo[i].published &&
-                        bugDate < releasesForRepo[i + 1].published);
-                }).length > 0) {
+                if (bugs.filter(bug => bug.repo === repo &&
+                    bug.createdAt > releasesForRepo[i].published &&
+                    bug.createdAt < releasesForRepo[i + 1].published).length > 0) {
                     failedDeploys += 1;
                 }
             }
@@ -37449,6 +37488,7 @@ class ChangeFailureRate {
 
 ;// CONCATENATED MODULE: ./src/IssuesAdapter.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 class IssuesAdapter {
     client;
@@ -37466,7 +37506,8 @@ class IssuesAdapter {
         try {
             let result = [];
             for (const repo of this.repositories) {
-                result = result.concat(await this.client.paginate('GET /repos/{owner}/{repo}/issues?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() }));
+                const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/issues?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+                result = result.concat(payloads.map(payload => toIssue(this.owner, repo, payload)));
             }
             return result;
         }
@@ -37481,8 +37522,7 @@ const MeanTimeToRestore_ONE_DAY = 1000 * 60 * 60 * 24;
 class MeanTimeToRestore {
     today;
     issues;
-    releases;
-    releaseDates; // array of object with unix time and repo url
+    releases; // Sorted ascending by publishedAt
     bugLabel;
     constructor(issues, releases, today = null, bugLabel = 'bug') {
         if (today === null) {
@@ -37492,16 +37532,11 @@ class MeanTimeToRestore {
             this.today = today;
         }
         this.issues = issues;
-        this.releases = releases;
         this.bugLabel = bugLabel;
-        if (this.releases === null || this.releases.length === 0) {
+        if (releases === null || releases.length === 0) {
             throw new Error('Empty release list');
         }
-        this.releaseDates = this.releases
-            .map(function (r) {
-            return { published: +new Date(r.published_at), url: r.url };
-        })
-            .sort((a, b) => a.published - b.published); // Sort ascending
+        this.releases = [...releases].sort((a, b) => a.publishedAt - b.publishedAt);
     }
     getBugCount() {
         const bugs = this.getIssuesTaggedAsBug();
@@ -37511,16 +37546,13 @@ class MeanTimeToRestore {
     getStartAndEndTimesForBugs(bugs) {
         const values = [];
         for (const bug of bugs) {
-            const createdAt = +new Date(bug.created_at);
-            const closedAt = +new Date(bug.closed_at);
-            const repoName = bug.repository_url.split('/').reverse()[0];
-            if (bug.closed_at != null &&
-                this.hasLaterRelease(closedAt, repoName) &&
-                this.hasPreviousRelease(createdAt, repoName)) {
+            if (bug.closedAt !== null &&
+                this.hasLaterRelease(bug.closedAt, bug.repo) &&
+                this.hasPreviousRelease(bug.createdAt, bug.repo)) {
                 values.push({
-                    start: createdAt,
-                    end: closedAt,
-                    repo: repoName
+                    start: bug.createdAt,
+                    end: bug.closedAt,
+                    repo: bug.repo
                 });
             }
         }
@@ -37529,40 +37561,37 @@ class MeanTimeToRestore {
     getIssuesTaggedAsBug() {
         const bugs = [];
         for (const issue of this.issues) {
-            const createdAt = +new Date(issue.created_at);
-            if (issue.labels.filter(label => label.name === this.bugLabel).length > 0 &&
-                createdAt > this.today.getTime() - 30 * MeanTimeToRestore_ONE_DAY) {
+            if (issue.labels.includes(this.bugLabel) &&
+                issue.createdAt > this.today.getTime() - 30 * MeanTimeToRestore_ONE_DAY) {
                 bugs.push(issue);
             }
         }
         return bugs;
     }
     hasPreviousRelease(date, repo) {
-        return (this.releaseDates.filter(r => r.published < date && r.url.includes(repo))
-            .length > 0);
+        return this.releases.some(r => r.publishedAt < date && r.repo === repo);
     }
     getReleaseBefore(date, repo) {
-        const rdates = this.releaseDates.filter(r => r.published < date && r.url.includes(repo));
-        if (rdates.length === 0) {
+        const releases = this.releases.filter(r => r.publishedAt < date && r.repo === repo);
+        if (releases.length === 0) {
             throw new Error('No previous releases');
         }
-        return rdates.pop();
+        return releases.pop();
     }
     getReleaseAfter(date, repo) {
-        const rdates = this.releaseDates.filter(r => r.published > date && r.url.includes(repo));
-        if (rdates.length === 0) {
+        const releases = this.releases.filter(r => r.publishedAt > date && r.repo === repo);
+        if (releases.length === 0) {
             throw new Error('No later releases');
         }
-        return rdates.reverse().pop();
+        return releases[0];
     }
     hasLaterRelease(date, repo) {
-        return (this.releaseDates.filter(r => r.published > date && r.url.includes(repo))
-            .length > 0);
+        return this.releases.some(r => r.publishedAt > date && r.repo === repo);
     }
     getRestoreTime(bug) {
         const prevRel = this.getReleaseBefore(bug.start, bug.repo);
         const nextRel = this.getReleaseAfter(bug.end, bug.repo);
-        return nextRel.published - prevRel.published;
+        return nextRel.publishedAt - prevRel.publishedAt;
     }
     mttr() {
         const ttr = this.getBugCount().map(bug => {
@@ -37582,6 +37611,7 @@ class MeanTimeToRestore {
 ;// CONCATENATED MODULE: ./src/PullRequestsAdapter.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+
 class PullRequestsAdapter {
     client;
     owner;
@@ -37598,7 +37628,8 @@ class PullRequestsAdapter {
         try {
             let result = [];
             for (const repo of this.repositories) {
-                result = result.concat(await this.client.paginate('GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() }));
+                const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+                result = result.concat(payloads.map(payload => toPullRequest(this.owner, repo, payload)));
             }
             return result;
         }
@@ -37611,6 +37642,7 @@ class PullRequestsAdapter {
 ;// CONCATENATED MODULE: ./src/CommitsAdapter.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+
 class CommitsAdapter {
     client;
     constructor(client) {
@@ -37618,7 +37650,8 @@ class CommitsAdapter {
     }
     async getCommitsFromUrl(url) {
         try {
-            return await this.client.request(url);
+            const payloads = await this.client.request(url);
+            return payloads.map(toCommit);
         }
         catch (e) {
             setFailed(e.message);
@@ -37627,6 +37660,7 @@ class CommitsAdapter {
 }
 
 ;// CONCATENATED MODULE: ./src/LeadTime.ts
+
 const LeadTime_ONE_DAY = 24 * 60 * 60 * 1000;
 class LeadTime {
     log = [];
@@ -37641,15 +37675,9 @@ class LeadTime {
         else {
             this.today = today;
         }
-        this.pulls = pulls.filter(p => +new Date(p.merged_at) > this.today.valueOf() - 31 * LeadTime_ONE_DAY);
-        this.releases = releases.map(r => {
-            return {
-                published: +new Date(r.published_at),
-                url: r.url,
-                name: r.name,
-                published_at: r.published_at
-            };
-        });
+        const since = this.today.valueOf() - 31 * LeadTime_ONE_DAY;
+        this.pulls = pulls.filter((p) => p.mergedAt !== null && p.mergedAt > since);
+        this.releases = releases;
         this.commitsAdapter = commitsAdapter;
     }
     getLog() {
@@ -37664,36 +37692,26 @@ class LeadTime {
         }
         const leadTimes = [];
         for (const pull of this.pulls) {
-            if (typeof pull.merged_at === 'string' &&
-                pull.merged_at &&
-                typeof pull.base.repo.name === 'string' &&
-                pull.base.repo.name &&
-                pull.base.ref === 'main') {
-                if (filtered &&
-                    !(pull.title.startsWith('feat') || pull.title.startsWith('fix'))) {
-                    continue;
-                }
-                const mergeTime = +new Date(pull.merged_at);
-                const laterReleases = this.releases.filter(r => r.published > mergeTime && r.url.includes(pull.base.repo.name));
-                if (laterReleases.length === 0) {
-                    continue;
-                }
-                const deployTime = laterReleases[0].published;
-                this.log.push(`pull->      ${pull.merged_at} : ${pull.title}`);
-                const commits = (await this.commitsAdapter.getCommitsFromUrl(pull.commits_url));
-                const commitTime = commits
-                    .map(c => +new Date(c.commit.committer.date))
-                    .sort((a, b) => a - b)[0];
-                const firstCommit = commits.sort((a, b) => {
-                    return (+new Date(a.commit.committer.date) -
-                        +new Date(b.commit.committer.date));
-                })[0];
-                this.log.push(`  commit->  ${firstCommit.commit.committer.date} : ${firstCommit.commit.message}`);
-                this.log.push(`  release-> ${laterReleases[0].published_at} : ${laterReleases[0].name}`);
-                const leadTime = (deployTime - commitTime) / LeadTime_ONE_DAY;
-                leadTimes.push(leadTime);
-                this.log.push(`  ${leadTime.toFixed(2)} days`);
+            if (pull.baseRef !== 'main') {
+                continue;
             }
+            if (filtered &&
+                !(pull.title.startsWith('feat') || pull.title.startsWith('fix'))) {
+                continue;
+            }
+            const laterReleases = this.releases.filter(r => r.publishedAt > pull.mergedAt && r.repo === pull.repo);
+            if (laterReleases.length === 0) {
+                continue;
+            }
+            const deployTime = laterReleases[0].publishedAt;
+            this.log.push(`pull->      ${isoTimestamp(pull.mergedAt)} : ${pull.title}`);
+            const commits = (await this.commitsAdapter.getCommitsFromUrl(pull.commitsUrl));
+            const firstCommit = commits.sort((a, b) => a.committedAt - b.committedAt)[0];
+            this.log.push(`  commit->  ${isoTimestamp(firstCommit.committedAt)} : ${firstCommit.message}`);
+            this.log.push(`  release-> ${isoTimestamp(laterReleases[0].publishedAt)} : ${laterReleases[0].name}`);
+            const leadTime = (deployTime - firstCommit.committedAt) / LeadTime_ONE_DAY;
+            leadTimes.push(leadTime);
+            this.log.push(`  ${leadTime.toFixed(2)} days`);
         }
         if (leadTimes.length === 0) {
             return 0;

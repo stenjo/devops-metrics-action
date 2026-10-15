@@ -1,19 +1,29 @@
 //
 import {DeployFrequency} from '../src/DeployFrequency'
 import fs from 'fs'
-import {Release} from '../src/types/Release'
+import type {Release} from '../src/types/Release'
+import type {GitHubReleasePayload} from '../src/github/payloads'
+import {toRelease} from '../src/github/mappers'
+
+function loadReleases(file: string, repo: string): Release[] {
+  return (
+    JSON.parse(fs.readFileSync(file, 'utf-8')) as GitHubReleasePayload[]
+  ).map(p => toRelease('stenjo', repo, p))
+}
 
 describe('Deploy frequency should', () => {
   // Release v0.0.1:2023-04-14, v0.0.2:2023-04-22
-  const releaseList2: Release[] = JSON.parse(
-    fs.readFileSync('./__tests__/test-data/one-release.json', 'utf-8')
+  const releaseList2: Release[] = loadReleases(
+    './__tests__/test-data/one-release.json',
+    'dora'
   )
   // Release
   // v0.0.1:2023-04-12, v0.0.2:2023-04-22, v0.1.0:2023-04-29,
   // v0.2.0:2023-04-30, v0.2.1:2023-04-30, v0.3.0-beta:2023-04-30,
   // v0.3.1-beta:2023-04-30
-  const releaseList7: Release[] = JSON.parse(
-    fs.readFileSync('./__tests__/test-data/releases.json', 'utf-8')
+  const releaseList7: Release[] = loadReleases(
+    './__tests__/test-data/releases.json',
+    'devops-metrics-action'
   )
   it('calculate releases pr week for release less than 1 week', () => {
     const df = new DeployFrequency(releaseList2, '2023-04-14T22:33:11Z')

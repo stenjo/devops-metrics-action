@@ -4,7 +4,11 @@ import {setFailed} from '@actions/core'
 import {ReleaseAdapter} from '../src/ReleaseAdapter'
 import {GitHubClient} from '../src/GitHubClient'
 import type {Release} from '../src/types/Release'
-import type {Person} from '../src/types/Person'
+import type {
+  GitHubPersonPayload,
+  GitHubReleasePayload
+} from '../src/github/payloads'
+import {releasePayload} from './helpers/payloads'
 
 const server = setupServer(
   http.get(
@@ -13,8 +17,8 @@ const server = setupServer(
     ({request, params, cookies}) => {
       const url = new URL(request.url)
       const page = url.searchParams.getAll('page')
-      const releases: Release[] = []
-      const author: Person = {
+      const releases: GitHubReleasePayload[] = []
+      const author: GitHubPersonPayload = {
         login: '',
         id: 0,
         node_id: '',
@@ -42,11 +46,11 @@ const server = setupServer(
           node_id: '',
           tag_name: '',
           target_commitish: '',
-          name: '',
+          name: `v${i}`,
           draft: false,
           prerelease: false,
           created_at: '',
-          published_at: '',
+          published_at: '2024-02-01T00:00:00Z',
           assets: [],
           tarball_url: '',
           zipball_url: '',
@@ -76,12 +80,38 @@ describe('Release Adapter should', () => {
     expect(true).toBe(true)
   })
 
-  it('return paged values', async () => {
-    const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
+  it('return paged values mapped to the domain type', async () => {
+    const r = new ReleaseAdapter(new GitHubClient(), 'Test-Owner', ['Project1'])
 
     const releases: Release[] = (await r.GetAllReleasesLastMonth()) as Release[]
 
     expect(releases.length).toBe(150)
+    expect(releases[1]).toEqual({
+      repo: 'test-owner/project1',
+      name: 'v1',
+      publishedAt: +new Date('2024-02-01T00:00:00Z')
+    })
+  })
+
+  it('key releases by the repository they were requested for', async () => {
+    server.use(
+      http.get(
+        'https://api.github.com/repos/:owner/:repo/releases',
+        ({params}) =>
+          HttpResponse.json([releasePayload({name: `${params.repo}`})])
+      )
+    )
+    const r = new ReleaseAdapter(new GitHubClient(), 'o', [
+      'api',
+      'api-gateway'
+    ])
+
+    const releases = (await r.GetAllReleasesLastMonth()) as Release[]
+
+    expect(releases.map(x => [x.repo, x.name])).toEqual([
+      ['o/api', 'api'],
+      ['o/api-gateway', 'api-gateway']
+    ])
   })
 
   it('request releases since 61 days back with auth and api-version headers', async () => {
@@ -91,7 +121,7 @@ describe('Release Adapter should', () => {
         'https://api.github.com/repos/:owner/:rep/releases',
         ({request}) => {
           seen.push(request)
-          return HttpResponse.json([{id: 1}])
+          return HttpResponse.json([releasePayload({id: 1})])
         }
       )
     )
@@ -123,7 +153,7 @@ describe('Release Adapter should', () => {
         ({request}) => {
           pages.push(new URL(request.url).searchParams.get('page') as string)
           return HttpResponse.json(
-            Array.from({length: 100}, (_, i) => ({id: i}))
+            Array.from({length: 100}, (_, i) => releasePayload({id: i}))
           )
         }
       )
