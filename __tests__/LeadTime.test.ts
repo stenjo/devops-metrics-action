@@ -3,6 +3,7 @@ import {GitHubClient} from '../src/GitHubClient'
 import type {Commit} from '../src/types/Commit'
 import type {PullRequest} from '../src/types/PullRequest'
 import type {Release} from '../src/types/Release'
+import type {RepoKey} from '../src/types/RepoKey'
 import {LeadTime} from '../src/LeadTime'
 import {commit, pull, release, ts} from './helpers/domain'
 
@@ -11,11 +12,9 @@ const OTHER = 'stenjo/other-repo'
 
 describe('LeadTime should', () => {
   const commitsAdapter: CommitsAdapter = new CommitsAdapter(new GitHubClient())
-  commitsAdapter.getCommitsFromUrl = vi.fn(
-    async (): Promise<Commit[] | undefined> => {
-      return Promise.resolve([commit('2023-04-22T17:50:53Z')])
-    }
-  )
+  commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => {
+    return Promise.resolve([commit('2023-04-22T17:50:53Z')])
+  })
 
   it('return 0 on no pull-requests', async () => {
     const pulls = [] as PullRequest[]
@@ -72,11 +71,9 @@ describe('LeadTime should', () => {
   it('return 8 on pull-requests with baseRef = main', async () => {
     const pullRequests = [pull({mergedAt: ts('2023-04-28T17:50:53Z')})] // 30-22 = 8
     const releases = [release('2023-04-30T17:50:53Z')]
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (): Promise<Commit[] | undefined> => {
-        return Promise.resolve([commit('2023-04-22T17:50:53Z')])
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => {
+      return Promise.resolve([commit('2023-04-22T17:50:53Z')])
+    })
     const lt = new LeadTime(
       pullRequests,
       releases,
@@ -93,18 +90,16 @@ describe('LeadTime should', () => {
     const pullRequests = [
       pull({
         mergedAt: ts('2023-04-28T17:50:53Z'),
-        commitsUrl: 'path/to/commits/1'
+        number: 1
       }) // 30-22 = 8
     ]
     const releases = [
       release('2023-04-29T17:50:53Z', OTHER),
       release('2023-04-30T17:50:53Z', DMA)
     ]
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (): Promise<Commit[] | undefined> => {
-        return Promise.resolve([commit('2023-04-22T17:50:53Z')])
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => {
+      return Promise.resolve([commit('2023-04-22T17:50:53Z')])
+    })
     const lt = new LeadTime(
       pullRequests,
       releases,
@@ -115,11 +110,9 @@ describe('LeadTime should', () => {
     const leadTime = await lt.getLeadTime()
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(commitsAdapter.getCommitsFromUrl).toHaveBeenCalled()
+    expect(commitsAdapter.getCommits).toHaveBeenCalled()
     // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(commitsAdapter.getCommitsFromUrl).toHaveBeenLastCalledWith(
-      'path/to/commits/1'
-    )
+    expect(commitsAdapter.getCommits).toHaveBeenLastCalledWith(DMA, 1)
     expect(leadTime).toBe(8)
   })
 
@@ -141,14 +134,12 @@ describe('LeadTime should', () => {
   it('return 11 on pull-requests with two commits', async () => {
     const pulls = [pull({mergedAt: ts('2023-04-29T17:50:53Z')})] // 30-19 = 11
     const rels = [release('2023-04-30T17:50:53Z')]
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (): Promise<Commit[] | undefined> => {
-        return Promise.resolve([
-          commit('2023-04-22T17:50:53Z'),
-          commit('2023-04-19T17:50:53Z')
-        ])
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => {
+      return Promise.resolve([
+        commit('2023-04-22T17:50:53Z'),
+        commit('2023-04-19T17:50:53Z')
+      ])
+    })
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
 
@@ -166,14 +157,12 @@ describe('LeadTime should', () => {
       release('2023-04-30T17:50:53Z', DMA),
       release('2023-04-29T17:50:53Z', OTHER)
     ]
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (): Promise<Commit[] | undefined> => {
-        return Promise.resolve([
-          commit('2023-04-22T17:50:53Z'),
-          commit('2023-04-19T17:50:53Z')
-        ])
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => {
+      return Promise.resolve([
+        commit('2023-04-22T17:50:53Z'),
+        commit('2023-04-19T17:50:53Z')
+      ])
+    })
 
     const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
 
@@ -183,15 +172,11 @@ describe('LeadTime should', () => {
   })
 
   it('return 8.5 on two pull-requests with two commits', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => {
-        return Promise.resolve(getCommits(url))
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(getCommits)
     // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
     const pulls = [
-      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '47'}), // 30-19 = 11
-      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10'}) // 28-22 = 6
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), number: 47}), // 30-19 = 11
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), number: 10}) // 28-22 = 6
     ]
     const rels = [
       release('2023-04-28T17:50:53Z'),
@@ -206,16 +191,12 @@ describe('LeadTime should', () => {
   })
 
   it('return 6,67 on three pull-requests with one commit each', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => {
-        return Promise.resolve(getCommits(url))
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(getCommits)
     // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
     const pulls = [
-      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '47'}), // commit 19/4, release 30/4 -> 11 days
-      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10'}), // commit 22/4, release 28/4 -> 6 days
-      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '15'}) // commit 27/4, release 30/4 -> 3 days
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), number: 47}), // commit 19/4, release 30/4 -> 11 days
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), number: 10}), // commit 22/4, release 28/4 -> 6 days
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), number: 15}) // commit 27/4, release 30/4 -> 3 days
     ]
     const rels = [
       release('2023-04-28T17:50:53Z'),
@@ -231,15 +212,11 @@ describe('LeadTime should', () => {
   })
 
   it('return 6 on three pull-requests with one commit each and two latest not released', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => {
-        return Promise.resolve(getCommits(url))
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(getCommits)
     const pulls = [
-      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '47'}),
-      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10'}), // commit 22/4, release 28/4 -> 6 days
-      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '15'})
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), number: 47}),
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), number: 10}), // commit 22/4, release 28/4 -> 6 days
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), number: 15})
     ]
     const rels = [
       release('2023-04-28T17:50:53Z'),
@@ -254,19 +231,15 @@ describe('LeadTime should', () => {
   })
 
   it('return 8 on three pull-requests with one commit each and two repos, latest not released', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => {
-        return Promise.resolve(getCommits(url))
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(getCommits)
     const pulls = [
       pull({
         mergedAt: ts('2023-04-27T17:50:53Z'),
-        commitsUrl: '47',
+        number: 47,
         repo: OTHER
       }), // commit 19/4, release 29/4 -> 10 days
-      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10', repo: DMA}), // commit 22/4, release 28/4 -> 6 days
-      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '15', repo: DMA}) // not released
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), number: 10, repo: DMA}), // commit 22/4, release 28/4 -> 6 days
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), number: 15, repo: DMA}) // not released
     ]
     const rels = [
       release('2023-04-28T17:50:53Z', DMA),
@@ -282,7 +255,7 @@ describe('LeadTime should', () => {
   })
 
   it('not attribute releases of a repo whose name is a prefix of another', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(async (): Promise<Commit[]> => [
+    commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => [
       commit('2023-04-22T17:50:53Z')
     ])
     const pulls = [pull({mergedAt: ts('2023-04-28T17:50:53Z'), repo: 'o/api'})]
@@ -316,19 +289,15 @@ describe('LeadTime should', () => {
   })
 
   it('get release log list weekly when rate calculated', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => {
-        return Promise.resolve(getCommits(url))
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(getCommits)
     const pulls = [
       pull({
         mergedAt: ts('2023-04-27T17:50:53Z'),
-        commitsUrl: '47',
+        number: 47,
         repo: OTHER
       }),
-      pull({mergedAt: ts('2023-04-27T17:50:53Z'), commitsUrl: '10', repo: DMA}),
-      pull({mergedAt: ts('2023-04-29T17:50:53Z'), commitsUrl: '15', repo: DMA})
+      pull({mergedAt: ts('2023-04-27T17:50:53Z'), number: 10, repo: DMA}),
+      pull({mergedAt: ts('2023-04-29T17:50:53Z'), number: 15, repo: DMA})
     ]
     const rels = [
       release('2023-04-28T17:50:53Z', DMA, 'v1.1.0'),
@@ -343,27 +312,23 @@ describe('LeadTime should', () => {
   })
 
   it('get event log list when lead time calculated', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => {
-        return Promise.resolve(getCommits(url))
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(getCommits)
     const pulls = [
       pull({
         mergedAt: ts('2023-04-27T17:50:53Z'),
-        commitsUrl: '47',
+        number: 47,
         repo: OTHER,
         title: 'feat(docs): better description'
       }),
       pull({
         mergedAt: ts('2023-04-27T17:50:53Z'),
-        commitsUrl: '10',
+        number: 10,
         repo: DMA,
         title: 'fix: removed error message'
       }),
       pull({
         mergedAt: ts('2023-04-29T17:50:53Z'),
-        commitsUrl: '15',
+        number: 15,
         repo: DMA,
         title: 'feat: handle several repos'
       })
@@ -383,27 +348,23 @@ describe('LeadTime should', () => {
   })
 
   it('get event log list when lead time calculated and filtered', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => {
-        return Promise.resolve(getCommits(url))
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(getCommits)
     const pulls = [
       pull({
         mergedAt: ts('2023-04-27T17:50:53Z'),
-        commitsUrl: '47',
+        number: 47,
         repo: OTHER,
         title: 'feat(docs): better description'
       }),
       pull({
         mergedAt: ts('2023-04-27T17:50:53Z'),
-        commitsUrl: '10',
+        number: 10,
         repo: DMA,
         title: 'chore: cleaned up'
       }),
       pull({
         mergedAt: ts('2023-04-29T17:50:53Z'),
-        commitsUrl: '15',
+        number: 15,
         repo: DMA,
         title: 'fix: removed error message'
       })
@@ -425,27 +386,23 @@ describe('LeadTime should', () => {
   })
 
   it('get event log list when lead time calculated and filtered with no fix or feat', async () => {
-    commitsAdapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => {
-        return Promise.resolve(getCommits(url))
-      }
-    )
+    commitsAdapter.getCommits = vi.fn(getCommits)
     const pulls = [
       pull({
         mergedAt: ts('2023-04-27T17:50:53Z'),
-        commitsUrl: '47',
+        number: 47,
         repo: OTHER,
         title: 'chore(docs): better description'
       }),
       pull({
         mergedAt: ts('2023-04-27T17:50:53Z'),
-        commitsUrl: '10',
+        number: 10,
         repo: DMA,
         title: 'chore: cleaned up'
       }),
       pull({
         mergedAt: ts('2023-04-29T17:50:53Z'),
-        commitsUrl: '15',
+        number: 15,
         repo: DMA,
         title: 'ci: removed error message'
       })
@@ -471,13 +428,11 @@ describe('LeadTime should', () => {
     const today = new Date('2023-05-01T00:00:00Z')
     const mainPull = pull({
       mergedAt: ts('2023-04-28T17:50:53Z'),
-      commitsUrl: '47',
+      number: 47,
       title: 'feat: something'
     })
     const adapter: CommitsAdapter = new CommitsAdapter(new GitHubClient())
-    adapter.getCommitsFromUrl = vi.fn(
-      async (url: string): Promise<Commit[] | undefined> => getCommits(url)
-    )
+    adapter.getCommits = vi.fn(getCommits)
 
     it('exclude a pull merged exactly 31 days ago', async () => {
       const pulls = [{...mainPull, mergedAt: ts('2023-03-31T00:00:00Z')}]
@@ -560,7 +515,7 @@ describe('LeadTime should', () => {
     })
 
     it('log the earliest commit even when commits are unsorted', async () => {
-      adapter.getCommitsFromUrl = vi.fn(async (): Promise<Commit[]> => [
+      adapter.getCommits = vi.fn(async (): Promise<Commit[]> => [
         commit('2023-04-25T00:00:00Z', 'later'),
         commit('2023-04-20T00:00:00Z', 'first'),
         commit('2023-04-22T00:00:00Z', 'middle')
@@ -586,11 +541,14 @@ describe('LeadTime should', () => {
   })
 
   // Returning commits from (10)=>22/4, (15)=>27/4 and (47)=>19/4
-  async function getCommits(url: string): Promise<Commit[]> {
-    if (url === '10') {
+  async function getCommits(
+    _repo: RepoKey,
+    pullNumber: number
+  ): Promise<Commit[]> {
+    if (pullNumber === 10) {
       return [commit('2023-04-22T17:50:53Z', 'wip: changed to commonjs')]
     }
-    if (url === '15') {
+    if (pullNumber === 15) {
       return [
         commit(
           '2023-04-27T17:50:53Z',
@@ -598,7 +556,7 @@ describe('LeadTime should', () => {
         )
       ]
     }
-    if (url === '47') {
+    if (pullNumber === 47) {
       return [commit('2023-04-19T17:50:53Z', 'all passing')]
     }
     return []

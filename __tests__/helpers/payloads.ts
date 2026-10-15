@@ -21,9 +21,9 @@ export function pullRequestPayload(
   overrides: Partial<GitHubPullRequestPayload> = {}
 ): GitHubPullRequestPayload {
   return {
+    number: 1,
     title: 'feat: something',
     merged_at: '2023-04-28T17:50:53Z',
-    commits_url: 'https://api.github.com/repos/o/r/pulls/1/commits',
     base: {ref: 'main', repo: {name: 'r'}},
     ...overrides
   } as GitHubPullRequestPayload
