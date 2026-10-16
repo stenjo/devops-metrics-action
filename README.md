@@ -130,14 +130,19 @@ Mean time to restore. This metric is calculated based on the time between the
 last release before an issue tagged with the `bug-label` label (default `bug`)
 and the first release after the issue is closed. For this to work correctly we
 must assume GitHub issues are created for all unwanted issues in production and
-that all changes to production is done through releases. Number in hours
-(integer)
+that all changes to production is done through releases. Number in days (two
+decimals)
+
+`mttr-log` - a JSON array of the bugs the mean is based on, each with the
+release before it was opened and the release after it was closed, if `logging`
+is enabled. See [Log outputs](#log-outputs).
 
 ### Log outputs
 
-With `logging: true` the action also emits `deploy-rate-log`, `lead-time-log`
-and `change-failure-rate-log`. All are **JSON array strings** meant to be
-parsed with `fromJSON` or `jq`, never echoed as free text. Records look like:
+With `logging: true` the action also emits `deploy-rate-log`, `lead-time-log`,
+`change-failure-rate-log` and `mttr-log`. All are **JSON array strings** meant
+to be parsed with `fromJSON` or `jq`, never echoed as free text. Records look
+like:
 
 ```json
 [{"kind": "release", "at": "2026-10-01T12:00:00Z", "name": "v1.4.1"}]
@@ -179,6 +184,29 @@ A `failed-release` record is one release interval counted as failed: the
 release that was deployed and the `bug-label` issues opened before the next
 release (or before now, for the latest release). The number of records equals
 the failed-deploy count used in the rate.
+
+```json
+[
+  {
+    "kind": "restore",
+    "number": 42,
+    "title": "bug: crash on start",
+    "createdAt": "2026-10-02T08:15:00Z",
+    "closedAt": "2026-10-03T10:00:00Z",
+    "releaseBefore": "v1.4.1",
+    "releaseBeforeAt": "2026-10-01T12:00:00Z",
+    "releaseAfter": "v1.4.2",
+    "releaseAfterAt": "2026-10-04T09:00:00Z",
+    "restoreDays": 2.88
+  }
+]
+```
+
+A `restore` record is one bug that contributes to the mean time to restore:
+the last release before it was opened, the first release after it was closed,
+and the days between those two releases. Bugs that are still open or that have
+no release on both sides are not counted and not logged, so the mean of
+`restoreDays` matches `mttr` (up to rounding).
 
 The logs are safe by construction:
 
@@ -223,6 +251,17 @@ Use `fromJSON` to work with the records in expressions, or `jq` in a script:
       echo '| --- | --- | --- |'
       jq -r '.[] | select(.kind == "failed-release")
         | "| \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title)"] | join("<br>")) |"' <<< "$CFR_LOG"
+    } >> "$GITHUB_STEP_SUMMARY"
+
+- name: Bugs behind the mean time to restore
+  env:
+    MTTR_LOG: ${{ steps.dora.outputs.mttr-log }}
+  run: |
+    {
+      echo '| Bug | Opened | Closed | Release before | Release after | Days |'
+      echo '| --- | --- | --- | --- | --- | --- |'
+      jq -r '.[] | select(.kind == "restore")
+        | "| #\(.number) \(.title) | \(.createdAt) | \(.closedAt) | \(.releaseBefore) | \(.releaseAfter) | \(.restoreDays) |"' <<< "$MTTR_LOG"
     } >> "$GITHUB_STEP_SUMMARY"
 ```
 

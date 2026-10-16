@@ -60,6 +60,12 @@ outputs:
       title, createdAt}]} records if logging true; sanitized and capped, ends
       with {kind:"truncated", omitted} when cut'
 
+  mttr-log: # list of bugs and the releases that bound their restore time
+    description: 'JSON array of {kind:"restore", number, title, createdAt,
+      closedAt, releaseBefore, releaseBeforeAt, releaseAfter, releaseAfterAt,
+      restoreDays} records if logging true; sanitized and capped, ends with
+      {kind:"truncated", omitted} when cut'
+
 runs:
   using: 'node24'
   main: 'dist/index.js'

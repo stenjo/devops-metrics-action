@@ -59,6 +59,7 @@ jobs:
           DEPLOY_RATE_LOG: ${{ steps.dora.outputs.deploy-rate-log }}
           LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
           CFR_LOG: ${{ steps.dora.outputs.change-failure-rate-log }}
+          MTTR_LOG: ${{ steps.dora.outputs.mttr-log }}
         run: |
           if ! jq -e 'type == "array"' <<< "$LEAD_TIME_LOG" > /dev/null 2>&1; then
             echo "Log outputs are not JSON yet (action older than v2); skipping summary"
@@ -88,6 +89,18 @@ jobs:
               echo '| --- | --- | --- |'
               jq -r '.[] | select(.kind == "failed-release") | "| \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title | gsub("\\|"; "\\|"))"] | join("<br>")) |"' <<< "$CFR_LOG"
               jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$CFR_LOG"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Absent until the action pin includes the mttr-log output.
+          if jq -e 'type == "array"' <<< "$MTTR_LOG" > /dev/null 2>&1; then
+            {
+              echo
+              echo '## Bugs behind the mean time to restore'
+              echo
+              echo '| Bug | Opened | Closed | Release before | Release after | Days |'
+              echo '| --- | --- | --- | --- | --- | --- |'
+              jq -r '.[] | select(.kind == "restore") | "| #\(.number) \(.title | gsub("\\|"; "\\|")) | \(.createdAt) | \(.closedAt) | \(.releaseBefore) | \(.releaseAfter) | \(.restoreDays) |"' <<< "$MTTR_LOG"
+              jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$MTTR_LOG"
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
