@@ -3,6 +3,7 @@ import type {IReleaseAdapter} from './interfaces/IReleaseAdapter'
 import type {GitHubClient} from './GitHubClient'
 import type {GitHubReleasePayload} from './github/payloads'
 import {toRelease} from './github/mappers'
+import {fetchWindowStart, isBeforeWindow} from './github/window'
 
 export class ReleaseAdapter implements IReleaseAdapter {
   client: GitHubClient
@@ -18,12 +19,20 @@ export class ReleaseAdapter implements IReleaseAdapter {
   }
 
   async GetAllReleasesLastMonth(): Promise<Release[]> {
-    const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000) // Go two months back
+    const windowStart = fetchWindowStart(this.today)
     let result: Release[] = []
     for (const repo of this.repositories) {
+      // Releases are returned newest first; drafts have no published_at.
       const payloads = await this.client.paginate<GitHubReleasePayload>(
-        'GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}',
-        {owner: this.owner, repo, since: since.toISOString()}
+        'GET /repos/{owner}/{repo}/releases',
+        {owner: this.owner, repo},
+        {
+          until: payload =>
+            isBeforeWindow(
+              windowStart,
+              payload.published_at ?? payload.created_at
+            )
+        }
       )
       result = result.concat(
         payloads.map(payload => toRelease(this.owner, repo, payload))

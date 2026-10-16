@@ -33,7 +33,7 @@ export interface GitHubReleasePayload {
   draft: boolean
   prerelease: boolean
   created_at: string
-  published_at: string
+  published_at: string | null
   assets: unknown[]
   tarball_url: string
   zipball_url: string
@@ -44,6 +44,7 @@ export interface GitHubPullRequestPayload {
   id: number
   number: number
   merged_at: string | null
+  updated_at: string
   base: {
     ref: string
     repo: {

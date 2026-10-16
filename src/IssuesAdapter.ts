@@ -3,6 +3,7 @@ import type {Issue} from './types/Issue'
 import type {GitHubClient} from './GitHubClient'
 import type {GitHubIssuePayload} from './github/payloads'
 import {toIssue} from './github/mappers'
+import {fetchWindowStart, isBeforeWindow} from './github/window'
 
 export class IssuesAdapter implements IIssuesAdapter {
   client: GitHubClient
@@ -18,12 +19,19 @@ export class IssuesAdapter implements IIssuesAdapter {
   }
 
   async GetAllIssuesLastMonth(): Promise<Issue[]> {
-    const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000) // Go two months back
+    const windowStart = fetchWindowStart(this.today)
     let result: Issue[] = []
     for (const repo of this.repositories) {
+      // /issues honours `since`; the predicate is a belt-and-braces stop.
       const payloads = await this.client.paginate<GitHubIssuePayload>(
-        'GET /repos/{owner}/{repo}/issues?state=all&since={since}&per_page={per_page}&page={page}',
-        {owner: this.owner, repo, since: since.toISOString()}
+        'GET /repos/{owner}/{repo}/issues',
+        {
+          owner: this.owner,
+          repo,
+          state: 'all',
+          since: new Date(windowStart).toISOString()
+        },
+        {until: payload => isBeforeWindow(windowStart, payload.updated_at)}
       )
       result = result.concat(
         payloads.map(payload => toIssue(this.owner, repo, payload))

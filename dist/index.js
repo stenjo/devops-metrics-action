@@ -39249,7 +39249,8 @@ function toRelease(owner, repo, payload) {
     return {
         repo: repoKey(owner, repo),
         name: sanitizeText(payload.name),
-        publishedAt: +new Date(payload.published_at)
+        // Drafts have no published_at; epoch 0 keeps them outside every window.
+        publishedAt: +new Date(payload.published_at ?? 0)
     };
 }
 function toPullRequest(owner, repo, payload) {
@@ -39278,7 +39279,22 @@ function toCommit(payload) {
     };
 }
 
+;// CONCATENATED MODULE: ./src/github/window.ts
+// Adapters fetch two months of history although every metric reports on the
+// last month only: MTTR and change-failure-rate need the release that preceded
+// a bug opened up to a month ago, so the fetch window must reach further back
+// than the metric window. Centralising this into a MetricsWindow is #460.
+function fetchWindowStart(today) {
+    return today.valueOf() - 61 * 24 * 60 * 60 * 1000;
+}
+// `until` predicate helper for GitHubClient.paginate: true once an item's
+// timestamp precedes the fetch window. A missing timestamp never stops paging.
+function isBeforeWindow(windowStart, value) {
+    return value !== null && +new Date(value) < windowStart;
+}
+
 ;// CONCATENATED MODULE: ./src/ReleaseAdapter.ts
+
 
 class ReleaseAdapter {
     client;
@@ -39292,10 +39308,13 @@ class ReleaseAdapter {
         this.today = new Date();
     }
     async GetAllReleasesLastMonth() {
-        const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
+        const windowStart = fetchWindowStart(this.today);
         let result = [];
         for (const repo of this.repositories) {
-            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+            // Releases are returned newest first; drafts have no published_at.
+            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/releases', { owner: this.owner, repo }, {
+                until: payload => isBeforeWindow(windowStart, payload.published_at ?? payload.created_at)
+            });
             result = result.concat(payloads.map(payload => toRelease(this.owner, repo, payload)));
         }
         return result;
@@ -39445,6 +39464,7 @@ class ChangeFailureRate {
 
 ;// CONCATENATED MODULE: ./src/IssuesAdapter.ts
 
+
 class IssuesAdapter {
     client;
     owner;
@@ -39457,10 +39477,16 @@ class IssuesAdapter {
         this.today = new Date();
     }
     async GetAllIssuesLastMonth() {
-        const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
+        const windowStart = fetchWindowStart(this.today);
         let result = [];
         for (const repo of this.repositories) {
-            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/issues?state=all&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+            // /issues honours `since`; the predicate is a belt-and-braces stop.
+            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/issues', {
+                owner: this.owner,
+                repo,
+                state: 'all',
+                since: new Date(windowStart).toISOString()
+            }, { until: payload => isBeforeWindow(windowStart, payload.updated_at) });
             result = result.concat(payloads.map(payload => toIssue(this.owner, repo, payload)));
         }
         return result;
@@ -39584,6 +39610,7 @@ class MeanTimeToRestore {
 
 ;// CONCATENATED MODULE: ./src/PullRequestsAdapter.ts
 
+
 class PullRequestsAdapter {
     client;
     owner;
@@ -39596,10 +39623,17 @@ class PullRequestsAdapter {
         this.today = new Date();
     }
     async GetAllPRsLastMonth() {
-        const since = new Date(this.today.valueOf() - 61 * 24 * 60 * 60 * 1000); // Go two months back
+        const windowStart = fetchWindowStart(this.today);
         let result = [];
         for (const repo of this.repositories) {
-            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/pulls?state=closed&since={since}&per_page={per_page}&page={page}', { owner: this.owner, repo, since: since.toISOString() });
+            // merged_at <= updated_at, so newest-updated-first is a safe superset.
+            const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/pulls', {
+                owner: this.owner,
+                repo,
+                state: 'closed',
+                sort: 'updated',
+                direction: 'desc'
+            }, { until: payload => isBeforeWindow(windowStart, payload.updated_at) });
             result = result.concat(payloads.map(payload => toPullRequest(this.owner, repo, payload)));
         }
         return result;

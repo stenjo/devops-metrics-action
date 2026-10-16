@@ -27,7 +27,8 @@ export function toRelease(
   return {
     repo: repoKey(owner, repo),
     name: sanitizeText(payload.name),
-    publishedAt: +new Date(payload.published_at)
+    // Drafts have no published_at; epoch 0 keeps them outside every window.
+    publishedAt: +new Date(payload.published_at ?? 0)
   }
 }
 
