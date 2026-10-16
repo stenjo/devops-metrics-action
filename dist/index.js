@@ -37466,6 +37466,7 @@ class DeployFrequency {
     entry(release) {
         return {
             kind: 'release',
+            repo: release.repo,
             at: isoTimestamp(release.publishedAt),
             name: release.name
         };
@@ -37535,6 +37536,7 @@ class ChangeFailureRate {
                     failedDeploys += 1;
                     this.log.push({
                         kind: 'failed-release',
+                        repo,
                         at: isoTimestamp(release.publishedAt),
                         name: release.name,
                         bugs: bugsInInterval.map(bug => ({
@@ -37673,6 +37675,7 @@ class MeanTimeToRestore {
             sum += restoreTime;
             this.log.push({
                 kind: 'restore',
+                repo: bug.issue.repo,
                 number: bug.issue.number,
                 title: bug.issue.title,
                 createdAt: isoTimestamp(bug.start),
@@ -37773,6 +37776,7 @@ class LeadTime {
             leadTimes.push(leadTime);
             this.log.push({
                 kind: 'pull',
+                repo: pull.repo,
                 at: isoTimestamp(pull.mergedAt),
                 title: pull.title,
                 commitAt: isoTimestamp(firstCommit.committedAt),

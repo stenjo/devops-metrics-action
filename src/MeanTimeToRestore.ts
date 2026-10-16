@@ -140,6 +140,7 @@ export class MeanTimeToRestore {
       sum += restoreTime
       this.log.push({
         kind: 'restore',
+        repo: bug.issue.repo,
         number: bug.issue.number,
         title: bug.issue.title,
         createdAt: isoTimestamp(bug.start),

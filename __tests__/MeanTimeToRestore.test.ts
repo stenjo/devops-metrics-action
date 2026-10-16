@@ -53,6 +53,7 @@ describe('MeanTimeToRestore should', () => {
       expect(m.getLog()).toEqual([
         {
           kind: 'restore',
+          repo: 'stenjo/devops-metrics-action',
           number: 26,
           title: 'fix: include also closed issues in issue list',
           createdAt: '2023-04-25T21:21:49Z',
@@ -65,6 +66,7 @@ describe('MeanTimeToRestore should', () => {
         },
         {
           kind: 'restore',
+          repo: 'stenjo/devops-metrics-action',
           number: 16,
           title: 'Add test json data to project',
           createdAt: '2023-04-22T21:44:06Z',

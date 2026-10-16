@@ -69,6 +69,7 @@ export class LeadTime {
       leadTimes.push(leadTime)
       this.log.push({
         kind: 'pull',
+        repo: pull.repo,
         at: isoTimestamp(pull.mergedAt),
         title: pull.title,
         commitAt: isoTimestamp(firstCommit.committedAt),

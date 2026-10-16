@@ -519,13 +519,19 @@ describe('run', () => {
     )
     ;(DeployFrequency.prototype.rate as Mock).mockReturnValue('5')
     ;(DeployFrequency.prototype.getLog as Mock).mockReturnValue([
-      {kind: 'release', at: '2023-04-22T20:28:29Z', name: 'v0.0.2'},
-      {kind: 'release', at: '2023-04-12T22:33:24Z', name: 'v0.0.1'}
+      {
+        kind: 'release',
+        repo: 'o/r',
+        at: '2023-04-22T20:28:29Z',
+        name: 'v0.0.2'
+      },
+      {kind: 'release', repo: 'o/r', at: '2023-04-12T22:33:24Z', name: 'v0.0.1'}
     ])
     ;(LeadTime.prototype.getLeadTime as Mock).mockResolvedValue(10)
     ;(LeadTime.prototype.getLog as Mock).mockReturnValue([
       {
         kind: 'pull',
+        repo: 'o/r',
         at: '2023-04-28T17:50:53Z',
         title: 'feat: something',
         commitAt: '2023-04-20T00:00:00Z',
@@ -539,6 +545,7 @@ describe('run', () => {
     ;(ChangeFailureRate.prototype.getLog as Mock).mockReturnValue([
       {
         kind: 'failed-release',
+        repo: 'o/r',
         at: '2023-04-12T22:33:24Z',
         name: 'v0.0.1',
         bugs: [{number: 3, title: 'bug: x', createdAt: '2023-04-13T00:00:00Z'}]
@@ -548,6 +555,7 @@ describe('run', () => {
     ;(MeanTimeToRestore.prototype.getLog as Mock).mockReturnValue([
       {
         kind: 'restore',
+        repo: 'o/r',
         number: 3,
         title: 'bug: x',
         createdAt: '2023-04-13T00:00:00Z',
@@ -607,20 +615,20 @@ describe('run', () => {
     const expected = {
       'deploy-rate': '5',
       'deploy-rate-log':
-        '[{"kind":"release","at":"2023-04-22T20:28:29Z","name":"v0.0.2"},' +
-        '{"kind":"release","at":"2023-04-12T22:33:24Z","name":"v0.0.1"}]',
+        '[{"kind":"release","repo":"o/r","at":"2023-04-22T20:28:29Z","name":"v0.0.2"},' +
+        '{"kind":"release","repo":"o/r","at":"2023-04-12T22:33:24Z","name":"v0.0.1"}]',
       'lead-time': 10,
       'lead-time-log':
-        '[{"kind":"pull","at":"2023-04-28T17:50:53Z","title":"feat: something",' +
+        '[{"kind":"pull","repo":"o/r","at":"2023-04-28T17:50:53Z","title":"feat: something",' +
         '"commitAt":"2023-04-20T00:00:00Z","commitMessage":"first",' +
         '"releaseAt":"2023-04-30T17:50:53Z","release":"v1.0.0","leadTimeDays":10.74}]',
       'change-failure-rate': 0.1,
       'change-failure-rate-log':
-        '[{"kind":"failed-release","at":"2023-04-12T22:33:24Z","name":"v0.0.1",' +
+        '[{"kind":"failed-release","repo":"o/r","at":"2023-04-12T22:33:24Z","name":"v0.0.1",' +
         '"bugs":[{"number":3,"title":"bug: x","createdAt":"2023-04-13T00:00:00Z"}]}]',
       mttr: 3,
       'mttr-log':
-        '[{"kind":"restore","number":3,"title":"bug: x",' +
+        '[{"kind":"restore","repo":"o/r","number":3,"title":"bug: x",' +
         '"createdAt":"2023-04-13T00:00:00Z","closedAt":"2023-04-14T00:00:00Z",' +
         '"releaseBefore":"v0.0.1","releaseBeforeAt":"2023-04-12T22:33:24Z",' +
         '"releaseAfter":"v0.0.2","releaseAfterAt":"2023-04-22T20:28:29Z",' +

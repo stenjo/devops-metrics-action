@@ -121,7 +121,12 @@ describe('Deploy frequency should', () => {
     df.weekly()
 
     expect(df.getLog()).toEqual([
-      {kind: 'release', at: '2023-04-22T20:28:29Z', name: 'v0.0.2'}
+      {
+        kind: 'release',
+        repo: 'stenjo/dora',
+        at: '2023-04-22T20:28:29Z',
+        name: 'v0.0.2'
+      }
     ])
   })
 
@@ -131,8 +136,18 @@ describe('Deploy frequency should', () => {
     df.monthly()
 
     expect(df.getLog()).toEqual([
-      {kind: 'release', at: '2023-04-22T20:28:29Z', name: 'v0.0.2'},
-      {kind: 'release', at: '2023-04-12T22:33:24Z', name: 'v0.0.1'}
+      {
+        kind: 'release',
+        repo: 'stenjo/dora',
+        at: '2023-04-22T20:28:29Z',
+        name: 'v0.0.2'
+      },
+      {
+        kind: 'release',
+        repo: 'stenjo/dora',
+        at: '2023-04-12T22:33:24Z',
+        name: 'v0.0.1'
+      }
     ])
   })
 })

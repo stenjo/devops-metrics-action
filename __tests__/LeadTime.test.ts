@@ -528,6 +528,7 @@ describe('LeadTime should', () => {
       expect(lt.getLog()).toEqual([
         {
           kind: 'pull',
+          repo: DMA,
           at: '2023-04-28T17:50:53Z',
           title: 'feat: something',
           commitAt: '2023-04-20T00:00:00Z',

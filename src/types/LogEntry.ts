@@ -1,11 +1,16 @@
+import type {RepoKey} from './RepoKey'
+
+// Every record names its repository (`owner/repo`) so multi-repo runs stay attributable.
 export interface ReleaseLogEntry {
   kind: 'release'
+  repo: RepoKey
   at: string
   name: string
 }
 
 export interface PullLogEntry {
   kind: 'pull'
+  repo: RepoKey
   at: string
   title: string
   commitAt: string
@@ -25,6 +30,7 @@ export interface BugLogEntry {
 // the bugs opened before the next release (or before now, for the latest).
 export interface FailedReleaseLogEntry {
   kind: 'failed-release'
+  repo: RepoKey
   at: string
   name: string
   bugs: BugLogEntry[]
@@ -34,6 +40,7 @@ export interface FailedReleaseLogEntry {
 // it was opened and the first release after it was closed bound the restore time.
 export interface RestoreLogEntry {
   kind: 'restore'
+  repo: RepoKey
   number: number
   title: string
   createdAt: string
