@@ -198,7 +198,9 @@ describe('log outputs end to end', () => {
       pulls,
       [release('2023-04-30T17:50:53Z')],
       commits,
-      today
+      today,
+      undefined,
+      {maxCommitFetches: 1000, concurrency: 4}
     )
     await lt.getLeadTime()
 

@@ -40,7 +40,10 @@ describe('index.ts bootstrap', () => {
     await importIndex()
 
     expect(parseInputs).toHaveBeenCalledWith(core, github.context, process.env)
-    expect(GitHubClient).toHaveBeenCalledWith({token: 'the-token'})
+    expect(GitHubClient).toHaveBeenCalledWith({
+      token: 'the-token',
+      logger: core
+    })
     expect(run).toHaveBeenCalledWith({
       inputs,
       client: vi.mocked(GitHubClient).mock.instances[0],
@@ -137,7 +140,10 @@ describe('index.ts token resolution (real parseInputs)', () => {
     await importIndex()
 
     expect(core.setSecret).toHaveBeenCalledExactlyOnceWith('env-secret')
-    expect(GitHubClient).toHaveBeenCalledWith({token: 'env-secret'})
+    expect(GitHubClient).toHaveBeenCalledWith({
+      token: 'env-secret',
+      logger: core
+    })
     expect(vi.mocked(core.setSecret).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(GitHubClient).mock.invocationCallOrder[0]
     )

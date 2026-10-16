@@ -46,7 +46,9 @@ if no repositories are specified.
 Every repository name is validated against GitHub's naming rules (letters,
 digits, `_`, `.` and `-`, 1–100 characters, no `..`) before any API call is
 made. An invalid entry fails the run with a message naming the offending
-value.
+value. At most **25 repositories** can be analysed in one run; more than that
+fails the run before any API call (see
+[API usage and limits](#api-usage-and-limits)).
 
 ### `owner`
 
@@ -281,6 +283,26 @@ Use `fromJSON` to work with the records in expressions, or `jq` in a script:
 > **Migrating from v1:** the logs used to be newline-separated free text
 > (`pull->  <date> : <title>` lines). Any consumer that `grep`ped or split those
 > lines must switch to `fromJSON` / `jq` on the record fields above.
+
+## API usage and limits
+
+A run costs roughly three paginated listings per repository (releases, pull
+requests, issues) plus one request per merged pull request that has a later
+release. To keep a run within the budget of the caller's token (1,000
+requests per hour for `GITHUB_TOKEN`), the action bounds itself:
+
+| Bound                                   | Value | When exceeded                                                                   |
+| --------------------------------------- | ----- | ------------------------------------------------------------------------------- |
+| Repositories per run                    | 25    | The run fails before any API call, naming the limit.                            |
+| Pages per listing per repository        | 99    | Paging stops and a warning is written; results for that listing are incomplete. |
+| Pull requests whose commits are fetched | 200   | A warning is written; `lead-time` is computed from the first 200.               |
+| Commit requests in flight at once       | 4     | —                                                                               |
+
+Requests are issued through the Octokit `throttling` and `retry` plugins: a
+primary rate limit is waited out and retried once, a secondary (abuse) limit
+is logged and not retried, and transient `5xx` / network failures are retried
+with backoff. The remaining rate limit (`x-ratelimit-remaining`) is written to
+the log at the end of every successful run.
 
 ## Usage
 

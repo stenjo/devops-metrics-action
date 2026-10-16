@@ -8,7 +8,12 @@ import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
 import {CommitsAdapter} from '../src/CommitsAdapter'
 import {LeadTime} from '../src/LeadTime'
 import type {GitHubClient} from '../src/GitHubClient'
-import {parseInputs, run, TOKEN_REQUIRED_MESSAGE} from '../src/main'
+import {
+  parseInputs,
+  run,
+  maxRepositories,
+  TOKEN_REQUIRED_MESSAGE
+} from '../src/main'
 import type {ActionsContext, Inputs} from '../src/main'
 import type {Release} from '../src/types/Release'
 import type {PullRequest} from '../src/types/PullRequest'
@@ -340,6 +345,31 @@ describe('parseInputs', () => {
     ])
   })
 
+  describe('repository cap', () => {
+    const repos = (count: number): string =>
+      Array.from({length: count}, (_, i) => `repo${i.toString()}`).join(',')
+
+    it('allows exactly the maximum number of repositories', () => {
+      expect(maxRepositories()).toBe(25)
+      const fake = fakeCore({token: 't', owner: 'o', repo: repos(25)})
+
+      const inputs = parseInputs(fake, context, {})
+
+      expect(inputs.repositories).toHaveLength(25)
+      expect(fake.info).toHaveBeenLastCalledWith('25 repositories registered.')
+    })
+
+    it('fails fast naming the limit when one repository too many is given', () => {
+      const fake = fakeCore({token: 't', owner: 'o', repo: repos(26)})
+
+      expect(() => parseInputs(fake, context, {})).toThrow(
+        'Too many repositories (26): at most 25 repositories can be analysed in one run'
+      )
+      expect(fake.info).not.toHaveBeenCalled()
+      expect(fake.setSecret).not.toHaveBeenCalled()
+    })
+  })
+
   it.each([
     ['true', true],
     ['false', false],
@@ -584,11 +614,18 @@ describe('run', () => {
   })
 
   it('feeds the fetched releases, pulls, commits and issues into the metrics', async () => {
-    await run({inputs: inputsWith(), client, core: fakeCore({})})
+    const fake = fakeCore({})
+    await run({inputs: inputsWith(), client, core: fake})
 
     const commits = vi.mocked(CommitsAdapter).mock.instances[0]
     expect(DeployFrequency).toHaveBeenCalledWith(mockReleases)
-    expect(LeadTime).toHaveBeenCalledWith(mockPRs, mockReleases, commits)
+    expect(LeadTime).toHaveBeenCalledWith(
+      mockPRs,
+      mockReleases,
+      commits,
+      null,
+      fake
+    )
     expect(ChangeFailureRate).toHaveBeenCalledWith(
       mockIssues,
       mockReleases,
@@ -748,5 +785,44 @@ describe('run', () => {
       null,
       'incident'
     )
+  })
+
+  it('logs the remaining rate limit once, after the outputs are set', async () => {
+    const fake = fakeCore({})
+
+    await run({
+      inputs: inputsWith(),
+      client: {rateLimitRemaining: 812} as GitHubClient,
+      core: fake
+    })
+
+    expect(fake.info).toHaveBeenCalledExactlyOnceWith(
+      'GitHub API rate limit remaining: 812'
+    )
+    expect(fake.info.mock.invocationCallOrder[0]).toBeGreaterThan(
+      fake.setOutput.mock.invocationCallOrder.at(-1) as number
+    )
+  })
+
+  it('logs the remaining rate limit as unknown when no response carried it', async () => {
+    const fake = fakeCore({})
+
+    await run({inputs: inputsWith(), client, core: fake})
+
+    expect(fake.info).toHaveBeenCalledExactlyOnceWith(
+      'GitHub API rate limit remaining: unknown'
+    )
+  })
+
+  it('does not log the rate limit when the run fails', async () => {
+    ;(LeadTime.prototype.getLeadTime as Mock).mockRejectedValueOnce(
+      new Error('Failed to fetch')
+    )
+    const fake = fakeCore({})
+
+    await expect(
+      run({inputs: inputsWith(), client, core: fake})
+    ).rejects.toThrow()
+    expect(fake.info).not.toHaveBeenCalled()
   })
 })

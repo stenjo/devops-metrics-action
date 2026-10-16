@@ -20,6 +20,8 @@ describe('CommitsAdapter', () => {
         request = mockRequest
       }
     )
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    vi.mocked(Octokit.plugin).mockReturnValue(Octokit)
     adapter = new CommitsAdapter(new GitHubClient({token: 'test-token'}))
   })
 
