@@ -1,8 +1,23 @@
 import {Octokit} from '@octokit/core'
+import {throttling} from '@octokit/plugin-throttling'
+import type {ThrottlingOptions} from '@octokit/plugin-throttling'
+import {retry} from '@octokit/plugin-retry'
+import type {Logger} from './types/Logger'
 
 export interface GitHubClientOptions {
   token?: string
   baseUrl?: string
+  logger?: Pick<Logger, 'warning'>
+}
+
+export interface ClientLimits {
+  perPage: number
+  maxPages: number
+}
+
+// A function rather than constants so the values are not static mutants for Stryker.
+export function defaultClientLimits(): ClientLimits {
+  return {perPage: 100, maxPages: 99}
 }
 
 export type RequestParams = Record<string, unknown>
@@ -33,11 +48,41 @@ export class GitHubApiError extends Error {
 
 export class GitHubClient {
   readonly octokit: Octokit
+  readonly limits: ClientLimits
+  // Last `x-ratelimit-remaining` seen on any response; undefined until one arrives.
+  rateLimitRemaining: number | undefined
+  private readonly logger: Pick<Logger, 'warning'>
 
-  constructor(options: GitHubClientOptions = {}) {
-    this.octokit = new Octokit({
+  constructor(
+    options: GitHubClientOptions = {},
+    limits: ClientLimits = defaultClientLimits()
+  ) {
+    this.logger = options.logger ?? {warning: () => undefined}
+    this.limits = limits
+    const ThrottledOctokit = Octokit.plugin(throttling, retry)
+    const throttle: ThrottlingOptions = {
+      // Primary limit: wait for the reset once, then give up.
+      onRateLimit: (retryAfter, request, _octokit, retryCount) => {
+        const retrying = retryCount < 1
+        this.logger.warning(
+          `GitHub API rate limit exhausted for ${request.method} ${request.url}; ${
+            retrying ? `retrying in ${retryAfter.toString()}s` : 'giving up'
+          }`
+        )
+        return retrying
+      },
+      // Secondary (abuse) limit: back off entirely rather than hammer the API.
+      onSecondaryRateLimit: (_retryAfter, request) => {
+        this.logger.warning(
+          `GitHub API secondary rate limit hit for ${request.method} ${request.url}; not retrying`
+        )
+        return false
+      }
+    }
+    this.octokit = new ThrottledOctokit({
       auth: options.token,
-      ...(options.baseUrl !== undefined && {baseUrl: options.baseUrl})
+      ...(options.baseUrl !== undefined && {baseUrl: options.baseUrl}),
+      throttle
     })
   }
 
@@ -52,9 +97,17 @@ export class GitHubClient {
         ...params,
         headers: {'X-GitHub-Api-Version': '2022-11-28'}
       })
+      this.recordRateLimit(result.headers)
       return result.data as T
     } catch (e: unknown) {
       throw new GitHubApiError(route, e)
+    }
+  }
+
+  private recordRateLimit(headers: Record<string, unknown> | undefined): void {
+    const remaining = headers?.['x-ratelimit-remaining']
+    if (typeof remaining === 'string' && /^\d+$/.test(remaining)) {
+      this.rateLimitRemaining = Number(remaining)
     }
   }
 
@@ -63,8 +116,7 @@ export class GitHubClient {
     params: RequestParams = {},
     options: PaginateOptions<T> = {}
   ): Promise<T[]> {
-    const perPage = 100
-    const maxPages = 99
+    const {perPage, maxPages} = this.limits
     let result: T[] = []
     for (let page = 1; page <= maxPages; page++) {
       const items = await this.request<T[]>(route, {
@@ -78,9 +130,12 @@ export class GitHubClient {
       }
       result = result.concat(items)
       if (items.length < perPage) {
-        break
+        return result
       }
     }
+    this.logger.warning(
+      `Stopped paging ${route} after ${maxPages.toString()} pages (${result.length.toString()} items); results may be incomplete`
+    )
     return result
   }
 }

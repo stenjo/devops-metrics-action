@@ -38,6 +38,12 @@ export type ActionsCore = Pick<
 export const TOKEN_REQUIRED_MESSAGE =
   'A GitHub token is required: set the `token` input or the GH_TOKEN environment variable'
 
+// Every repository costs up to three paginated listings plus one request per
+// qualifying pull request, so a run is bounded here before any call is made.
+export function maxRepositories(): number {
+  return 25
+}
+
 // GitHub owner and repository names: letters, digits, '_', '.', '-'; 1–100 chars.
 function validateName(kind: 'owner' | 'repo', value: string): string {
   if (!/^[A-Za-z0-9_.-]{1,100}$/.test(value) || value.includes('..')) {
@@ -110,7 +116,7 @@ export interface ActionsContext {
 export interface RunDeps {
   inputs: Inputs
   client: GitHubClient
-  core: Pick<ActionsCore, 'info' | 'setOutput'>
+  core: Pick<ActionsCore, 'info' | 'warning' | 'setOutput'>
 }
 
 export function parseInputs(
@@ -136,6 +142,12 @@ export function parseInputs(
     .split(/[[\]\s,]+/)
     .filter(x => x !== '')
     .map(entry => parseRepoEntry(entry, owner))
+
+  if (repositories.length > maxRepositories()) {
+    throw new Error(
+      `Too many repositories (${repositories.length.toString()}): at most ${maxRepositories().toString()} repositories can be analysed in one run`
+    )
+  }
 
   for (const repository of repositories) {
     core.info(`${owner}/${repository}`)
@@ -189,7 +201,13 @@ export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
   ).GetAllIssuesLastMonth()
 
   const df = new DeployFrequency(releaseList)
-  const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client))
+  const lt = new LeadTime(
+    pulls,
+    releaseList,
+    new CommitsAdapter(client),
+    null,
+    core
+  )
   const leadTime = await lt.getLeadTime(filtered)
   const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel)
   const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel)
@@ -207,6 +225,10 @@ export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
   for (const [name, value] of Object.entries(outputs)) {
     core.setOutput(name, value)
   }
+
+  core.info(
+    `GitHub API rate limit remaining: ${client.rateLimitRemaining?.toString() ?? 'unknown'}`
+  )
 
   return outputs
 }

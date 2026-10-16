@@ -7,7 +7,11 @@ import {parseInputs, run} from './main'
 async function bootstrap(): Promise<void> {
   try {
     const inputs = parseInputs(core, github.context, process.env)
-    await run({inputs, client: new GitHubClient({token: inputs.token}), core})
+    await run({
+      inputs,
+      client: new GitHubClient({token: inputs.token, logger: core}),
+      core
+    })
   } catch (error: unknown) {
     // The raw API error goes to the log only; the failure message stays stable.
     if (error instanceof GitHubApiError && error.cause instanceof Error) {

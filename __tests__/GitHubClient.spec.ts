@@ -1,7 +1,31 @@
-import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
+import {
+  GitHubClient,
+  GitHubApiError,
+  defaultClientLimits
+} from '../src/GitHubClient'
 import {Octokit} from '@octokit/core'
+import {throttling} from '@octokit/plugin-throttling'
+import type {ThrottlingOptions} from '@octokit/plugin-throttling'
+import {retry} from '@octokit/plugin-retry'
 
 vi.mock('@octokit/core')
+
+type LimitHandlers = Required<
+  Pick<ThrottlingOptions, 'onRateLimit' | 'onSecondaryRateLimit'>
+>
+
+function constructorOptions(): Record<string, unknown> & {
+  throttle: LimitHandlers
+} {
+  return vi.mocked(Octokit).mock.calls[0][0] as Record<string, unknown> & {
+    throttle: LimitHandlers
+  }
+}
+
+const requestOptions = {
+  method: 'GET',
+  url: '/repos/{owner}/{repo}/releases'
+} as Parameters<LimitHandlers['onRateLimit']>[1]
 
 describe('GitHubClient', () => {
   let mockRequest: Mock
@@ -14,6 +38,8 @@ describe('GitHubClient', () => {
         request = mockRequest
       }
     )
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    vi.mocked(Octokit.plugin).mockReturnValue(Octokit)
   })
 
   afterEach(() => {
@@ -21,28 +47,95 @@ describe('GitHubClient', () => {
   })
 
   describe('constructor', () => {
-    it('creates one Octokit authenticated with the token', () => {
+    it('creates one Octokit with the throttling and retry plugins, authenticated with the token', () => {
       const client = new GitHubClient({token: 'my-token'})
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(Octokit.plugin).toHaveBeenCalledExactlyOnceWith(throttling, retry)
       expect(Octokit).toHaveBeenCalledTimes(1)
-      expect(Octokit).toHaveBeenCalledWith({auth: 'my-token'})
+      expect(Octokit).toHaveBeenCalledWith({
+        auth: 'my-token',
+        throttle: {
+          onRateLimit: expect.any(Function) as unknown,
+          onSecondaryRateLimit: expect.any(Function) as unknown
+        }
+      })
       expect(client.octokit).toBeDefined()
     })
 
     it('creates an unauthenticated Octokit when no options are given', () => {
       new GitHubClient()
 
-      expect(Octokit).toHaveBeenCalledWith({auth: undefined})
-      expect(vi.mocked(Octokit).mock.calls[0][0]).not.toHaveProperty('baseUrl')
+      expect(constructorOptions()).toMatchObject({auth: undefined})
+      expect(constructorOptions()).not.toHaveProperty('baseUrl')
     })
 
     it('passes baseUrl through when provided', () => {
       new GitHubClient({token: 't', baseUrl: 'https://ghe.example.com/api/v3'})
 
-      expect(Octokit).toHaveBeenCalledWith({
+      expect(constructorOptions()).toMatchObject({
         auth: 't',
         baseUrl: 'https://ghe.example.com/api/v3'
       })
+    })
+
+    it('uses the default limits of 100 items per page and 99 pages', () => {
+      expect(new GitHubClient().limits).toEqual({perPage: 100, maxPages: 99})
+      expect(defaultClientLimits()).toEqual({perPage: 100, maxPages: 99})
+    })
+
+    it('starts with an unknown remaining rate limit', () => {
+      expect(new GitHubClient().rateLimitRemaining).toBeUndefined()
+    })
+  })
+
+  describe('rate-limit handlers', () => {
+    let logger: {warning: Mock<(message: string) => void>}
+
+    beforeEach(() => {
+      logger = {warning: vi.fn()}
+      new GitHubClient({token: 't', logger})
+    })
+
+    it('retries once on the primary rate limit and warns with the wait', () => {
+      const {onRateLimit} = constructorOptions().throttle
+
+      expect(onRateLimit(42, requestOptions, {} as Octokit, 0)).toBe(true)
+      expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
+        'GitHub API rate limit exhausted for GET /repos/{owner}/{repo}/releases; retrying in 42s'
+      )
+    })
+
+    it('gives up on the primary rate limit after one retry', () => {
+      const {onRateLimit} = constructorOptions().throttle
+
+      expect(onRateLimit(42, requestOptions, {} as Octokit, 1)).toBe(false)
+      expect(onRateLimit(42, requestOptions, {} as Octokit, 2)).toBe(false)
+      expect(logger.warning).toHaveBeenLastCalledWith(
+        'GitHub API rate limit exhausted for GET /repos/{owner}/{repo}/releases; giving up'
+      )
+    })
+
+    it('never retries on the secondary rate limit and warns', () => {
+      const {onSecondaryRateLimit} = constructorOptions().throttle
+
+      expect(onSecondaryRateLimit(60, requestOptions, {} as Octokit, 0)).toBe(
+        false
+      )
+      expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
+        'GitHub API secondary rate limit hit for GET /repos/{owner}/{repo}/releases; not retrying'
+      )
+    })
+
+    it('does not fail when no logger is given', () => {
+      vi.clearAllMocks()
+      new GitHubClient()
+      const {onRateLimit, onSecondaryRateLimit} = constructorOptions().throttle
+
+      expect(onRateLimit(1, requestOptions, {} as Octokit, 0)).toBe(true)
+      expect(onSecondaryRateLimit(1, requestOptions, {} as Octokit, 0)).toBe(
+        false
+      )
     })
   })
 
@@ -137,6 +230,54 @@ describe('GitHubClient', () => {
         cause: undefined
       })
     })
+
+    it('records the remaining rate limit from the latest response', async () => {
+      mockRequest
+        .mockResolvedValueOnce({
+          data: 1,
+          headers: {'x-ratelimit-remaining': '4321'}
+        })
+        .mockResolvedValueOnce({
+          data: 2,
+          headers: {'x-ratelimit-remaining': '7'}
+        })
+      const client = new GitHubClient()
+
+      await client.request('GET /x')
+      expect(client.rateLimitRemaining).toBe(4321)
+
+      await client.request('GET /x')
+      expect(client.rateLimitRemaining).toBe(7)
+    })
+
+    it('keeps the last known remaining rate limit when a response carries none or a malformed value', async () => {
+      mockRequest
+        .mockResolvedValueOnce({
+          data: 1,
+          headers: {'x-ratelimit-remaining': '9'}
+        })
+        .mockResolvedValueOnce({data: 2})
+        .mockResolvedValueOnce({data: 3, headers: {}})
+        .mockResolvedValueOnce({
+          data: 4,
+          headers: {'x-ratelimit-remaining': ''}
+        })
+        .mockResolvedValueOnce({
+          data: 5,
+          headers: {'x-ratelimit-remaining': '12abc'}
+        })
+        .mockResolvedValueOnce({
+          data: 6,
+          headers: {'x-ratelimit-remaining': 'abc12'}
+        })
+        .mockResolvedValueOnce({data: 7, headers: {'x-ratelimit-remaining': 5}})
+      const client = new GitHubClient()
+
+      for (let i = 0; i < 7; i++) {
+        await client.request('GET /x')
+        expect(client.rateLimitRemaining).toBe(9)
+      }
+    })
   })
 
   describe('paginate', () => {
@@ -212,9 +353,10 @@ describe('GitHubClient', () => {
       expect(mockRequest).toHaveBeenCalledTimes(1)
     })
 
-    it('requests pages 1 to 99 at most when every page is full', async () => {
+    it('requests pages 1 to 99 at most when every page is full and warns about the cap', async () => {
       mockRequest.mockResolvedValue({data: page(100)})
-      const client = new GitHubClient()
+      const logger = {warning: vi.fn()}
+      const client = new GitHubClient({logger})
 
       const result = await client.paginate('GET /x')
 
@@ -222,6 +364,53 @@ describe('GitHubClient', () => {
       expect(mockRequest.mock.calls[0][1].page).toBe(1)
       expect(mockRequest.mock.calls[98][1].page).toBe(99)
       expect(result.length).toBe(9900)
+      expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
+        'Stopped paging GET /x after 99 pages (9900 items); results may be incomplete'
+      )
+    })
+
+    it('honours injected limits and does not warn when paging ends before the cap', async () => {
+      mockRequest
+        .mockResolvedValueOnce({data: page(5)})
+        .mockResolvedValueOnce({data: page(5, 5)})
+        .mockResolvedValueOnce({data: page(2, 10)})
+      const logger = {warning: vi.fn()}
+      const client = new GitHubClient({logger}, {perPage: 5, maxPages: 3})
+
+      const result = await client.paginate('GET /x')
+
+      expect(result.length).toBe(12)
+      expect(mockRequest.mock.calls.map(c => c[1].per_page)).toEqual([5, 5, 5])
+      expect(logger.warning).not.toHaveBeenCalled()
+    })
+
+    it('warns once when the injected page cap is hit', async () => {
+      mockRequest.mockResolvedValue({data: page(5)})
+      const logger = {warning: vi.fn()}
+      const client = new GitHubClient({logger}, {perPage: 5, maxPages: 2})
+
+      const result = await client.paginate('GET /x')
+
+      expect(result.length).toBe(10)
+      expect(mockRequest).toHaveBeenCalledTimes(2)
+      expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
+        'Stopped paging GET /x after 2 pages (10 items); results may be incomplete'
+      )
+    })
+
+    it('does not warn when until stops paging on the last allowed page', async () => {
+      mockRequest.mockResolvedValue({data: page(5)})
+      const logger = {warning: vi.fn()}
+      const client = new GitHubClient({logger}, {perPage: 5, maxPages: 1})
+
+      const result = await client.paginate<{id: number}>(
+        'GET /x',
+        {},
+        {until: item => item.id === 3}
+      )
+
+      expect(result.length).toBe(3)
+      expect(logger.warning).not.toHaveBeenCalled()
     })
 
     it('stops at the first item matching until and drops it and the rest', async () => {

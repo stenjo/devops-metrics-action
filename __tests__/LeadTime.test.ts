@@ -4,7 +4,8 @@ import type {Commit} from '../src/types/Commit'
 import type {PullRequest} from '../src/types/PullRequest'
 import type {Release} from '../src/types/Release'
 import type {RepoKey} from '../src/types/RepoKey'
-import {LeadTime} from '../src/LeadTime'
+import type {ICommitsAdapter} from '../src/interfaces/ICommitsAdapter'
+import {LeadTime, defaultLeadTimeLimits} from '../src/LeadTime'
 import {commit, pull, release, ts} from './helpers/domain'
 
 const DMA = 'stenjo/devops-metrics-action'
@@ -538,6 +539,276 @@ describe('LeadTime should', () => {
           leadTimeDays: 10.74
         }
       ])
+    })
+  })
+
+  describe('request bounds', () => {
+    const repoRelease: Release = release('2023-04-30T17:50:53Z', DMA, 'v1.0.0')
+    const today = new Date('2023-05-01T00:00:00Z')
+    const pulls = (count: number): PullRequest[] =>
+      Array.from({length: count}, (_, i) =>
+        pull({
+          mergedAt: ts('2023-04-28T17:50:53Z'),
+          number: i + 1,
+          title: `feat: change ${(i + 1).toString()}`
+        })
+      )
+
+    // Resolves each commit fetch on demand so concurrency can be observed.
+    function trackingAdapter(): {
+      adapter: ICommitsAdapter
+      getCommits: Mock<ICommitsAdapter['getCommits']>
+      inFlight: () => number
+      maxInFlight: () => number
+      release: (count: number) => void
+      releaseLast: () => void
+    } {
+      let inFlight = 0
+      let maxInFlight = 0
+      const pending: (() => void)[] = []
+      const getCommits = vi.fn(
+        async (_repo: RepoKey, pullNumber: number): Promise<Commit[]> =>
+          new Promise(resolve => {
+            inFlight++
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            pending.push(() => {
+              inFlight--
+              // Earlier commit for higher numbers, so order is visible in the log.
+              resolve([
+                commit(
+                  `2023-04-${(20 - (pullNumber % 10)).toString().padStart(2, '0')}T00:00:00Z`,
+                  `commit ${pullNumber.toString()}`
+                )
+              ])
+            })
+          })
+      )
+      return {
+        adapter: {getCommits},
+        getCommits,
+        inFlight: () => inFlight,
+        maxInFlight: () => maxInFlight,
+        release: (count: number) => {
+          for (let i = 0; i < count; i++) {
+            pending.shift()?.()
+          }
+        },
+        releaseLast: () => {
+          pending.pop()?.()
+        }
+      }
+    }
+
+    const settle = async (): Promise<void> =>
+      new Promise(resolve => setImmediate(resolve))
+
+    // Releases one pending fetch at a time until the run completes.
+    async function drain(
+      tracker: ReturnType<typeof trackingAdapter>,
+      run: Promise<number>
+    ): Promise<number> {
+      let done = false
+      const settled = run.finally(() => {
+        done = true
+      })
+      while (!done) {
+        tracker.release(1)
+        await settle()
+      }
+      return settled
+    }
+
+    it('default to at most 200 commit fetches, 4 in flight', () => {
+      expect(defaultLeadTimeLimits()).toEqual({
+        maxCommitFetches: 200,
+        concurrency: 4
+      })
+    })
+
+    it('fetch commits for at most 200 pull requests by default and warn once', async () => {
+      const logger = {warning: vi.fn()}
+      const getCommits = vi.fn(async (): Promise<Commit[]> => [
+        commit('2023-04-20T00:00:00Z')
+      ])
+      const lt = new LeadTime(
+        pulls(201),
+        [repoRelease],
+        {getCommits},
+        today,
+        logger
+      )
+
+      const leadTime = await lt.getLeadTime()
+
+      expect(getCommits).toHaveBeenCalledTimes(200)
+      expect(lt.getLog()).toHaveLength(200)
+      expect(lt.getLog().map(l => l.title)).toContain('feat: change 1')
+      expect(lt.getLog().map(l => l.title)).toContain('feat: change 200')
+      expect(lt.getLog().map(l => l.title)).not.toContain('feat: change 201')
+      expect(leadTime).toBe(10.74)
+      expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
+        'Lead time: fetching commits for only the first 200 of 201 qualifying pull requests'
+      )
+    })
+
+    it('not warn when the number of qualifying pull requests equals the cap', async () => {
+      const logger = {warning: vi.fn()}
+      const getCommits = vi.fn(async (): Promise<Commit[]> => [
+        commit('2023-04-20T00:00:00Z')
+      ])
+      const lt = new LeadTime(
+        pulls(3),
+        [repoRelease],
+        {getCommits},
+        today,
+        logger,
+        {maxCommitFetches: 3, concurrency: 4}
+      )
+
+      await lt.getLeadTime()
+
+      expect(getCommits).toHaveBeenCalledTimes(3)
+      expect(logger.warning).not.toHaveBeenCalled()
+    })
+
+    it('count only qualifying pull requests against the cap', async () => {
+      const logger = {warning: vi.fn()}
+      const getCommits = vi.fn(async (): Promise<Commit[]> => [
+        commit('2023-04-20T00:00:00Z')
+      ])
+      const input = [
+        ...pulls(2),
+        pull({mergedAt: ts('2023-04-28T17:50:53Z'), baseRef: 'develop'}),
+        pull({mergedAt: ts('2023-04-28T17:50:53Z'), repo: OTHER})
+      ]
+      const lt = new LeadTime(
+        input,
+        [repoRelease],
+        {getCommits},
+        today,
+        logger,
+        {
+          maxCommitFetches: 2,
+          concurrency: 4
+        }
+      )
+
+      await lt.getLeadTime()
+
+      expect(getCommits).toHaveBeenCalledTimes(2)
+      expect(logger.warning).not.toHaveBeenCalled()
+    })
+
+    it('keep the sampled pull requests in input order and skip the rest', async () => {
+      const logger = {warning: vi.fn()}
+      const tracker = trackingAdapter()
+      const lt = new LeadTime(
+        pulls(5),
+        [repoRelease],
+        tracker.adapter,
+        today,
+        logger,
+        {maxCommitFetches: 3, concurrency: 1}
+      )
+
+      const run = lt.getLeadTime()
+      await settle()
+      tracker.release(1)
+      await settle()
+      tracker.release(1)
+      await settle()
+      tracker.release(1)
+      await run
+
+      expect(tracker.getCommits.mock.calls.map(c => c[1])).toEqual([1, 2, 3])
+      expect(lt.getLog().map(l => l.title)).toEqual([
+        'feat: change 1',
+        'feat: change 2',
+        'feat: change 3'
+      ])
+      expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
+        'Lead time: fetching commits for only the first 3 of 5 qualifying pull requests'
+      )
+    })
+
+    it('fetch commits with at most 4 requests in flight by default', async () => {
+      const tracker = trackingAdapter()
+      const lt = new LeadTime(pulls(10), [repoRelease], tracker.adapter, today)
+
+      const run = lt.getLeadTime()
+      await settle()
+      expect(tracker.inFlight()).toBe(4)
+      expect(tracker.getCommits).toHaveBeenCalledTimes(4)
+
+      tracker.release(1)
+      await settle()
+      expect(tracker.inFlight()).toBe(4)
+      expect(tracker.getCommits).toHaveBeenCalledTimes(5)
+
+      await drain(tracker, run)
+
+      expect(tracker.maxInFlight()).toBe(4)
+      expect(tracker.getCommits).toHaveBeenCalledTimes(10)
+      expect(lt.getLog()).toHaveLength(10)
+    })
+
+    it('honour an injected concurrency limit', async () => {
+      const tracker = trackingAdapter()
+      const lt = new LeadTime(
+        pulls(5),
+        [repoRelease],
+        tracker.adapter,
+        today,
+        undefined,
+        {maxCommitFetches: 200, concurrency: 2}
+      )
+
+      const run = lt.getLeadTime()
+      await settle()
+      expect(tracker.inFlight()).toBe(2)
+
+      await drain(tracker, run)
+
+      expect(tracker.maxInFlight()).toBe(2)
+      expect(tracker.getCommits).toHaveBeenCalledTimes(5)
+    })
+
+    it('keep log order by pull request even when fetches finish out of order', async () => {
+      const tracker = trackingAdapter()
+      const lt = new LeadTime(
+        pulls(4),
+        [repoRelease],
+        tracker.adapter,
+        today,
+        undefined,
+        {maxCommitFetches: 200, concurrency: 4}
+      )
+
+      const run = lt.getLeadTime()
+      await settle()
+      // All four are in flight; finish 4 and 3 before 1 and 2.
+      tracker.releaseLast()
+      tracker.releaseLast()
+      await settle()
+      tracker.release(2)
+      await run
+
+      expect(tracker.getCommits.mock.calls.map(c => c[1])).toEqual([1, 2, 3, 4])
+      expect(lt.getLog().map(l => [l.title, l.commitMessage])).toEqual([
+        ['feat: change 1', 'commit 1'],
+        ['feat: change 2', 'commit 2'],
+        ['feat: change 3', 'commit 3'],
+        ['feat: change 4', 'commit 4']
+      ])
+    })
+
+    it('propagate a failing commit fetch', async () => {
+      const getCommits = vi.fn(async (): Promise<Commit[]> => {
+        throw new Error('boom')
+      })
+      const lt = new LeadTime(pulls(3), [repoRelease], {getCommits}, today)
+
+      await expect(lt.getLeadTime()).rejects.toThrow('boom')
     })
   })
 

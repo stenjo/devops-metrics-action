@@ -31,7 +31,9 @@ describe('run() with a failing GitHub API', () => {
     ;(Octokit as unknown as Mock).mockImplementation(function () {
       return {request}
     })
-    const core = {info: vi.fn(), setOutput: vi.fn()}
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    vi.mocked(Octokit.plugin).mockReturnValue(Octokit)
+    const core = {info: vi.fn(), warning: vi.fn(), setOutput: vi.fn()}
 
     const error = await run({
       inputs,
