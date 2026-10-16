@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // Raw GitHub REST payload shapes. Only the mappers in ./mappers.ts should
 // consume these; metric classes work on the domain types in ../types.
 
@@ -35,7 +34,7 @@ export interface GitHubReleasePayload {
   prerelease: boolean
   created_at: string
   published_at: string
-  assets: any[]
+  assets: unknown[]
   tarball_url: string
   zipball_url: string
   body: string
