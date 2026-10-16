@@ -39280,17 +39280,11 @@ function toCommit(payload) {
 }
 
 ;// CONCATENATED MODULE: ./src/github/window.ts
-// Adapters fetch two months of history although every metric reports on the
-// last month only: MTTR and change-failure-rate need the release that preceded
-// a bug opened up to a month ago, so the fetch window must reach further back
-// than the metric window. Centralising this into a MetricsWindow is #460.
-function fetchWindowStart(today) {
-    return today.valueOf() - 61 * 24 * 60 * 60 * 1000;
-}
 // `until` predicate helper for GitHubClient.paginate: true once an item's
-// timestamp precedes the fetch window. A missing timestamp never stops paging.
-function isBeforeWindow(windowStart, value) {
-    return value !== null && +new Date(value) < windowStart;
+// timestamp precedes `MetricsWindow.fetchFrom`. A missing timestamp never
+// stops paging.
+function isBeforeWindow(fetchFrom, value) {
+    return value !== null && +new Date(value) < fetchFrom;
 }
 
 ;// CONCATENATED MODULE: ./src/ReleaseAdapter.ts
@@ -39300,20 +39294,20 @@ class ReleaseAdapter {
     client;
     owner;
     repositories;
-    today;
-    constructor(client, owner, repositories) {
+    window;
+    constructor(client, owner, repositories, window) {
         this.client = client;
         this.owner = owner;
         this.repositories = repositories;
-        this.today = new Date();
+        this.window = window;
     }
     async GetAllReleasesLastMonth() {
-        const windowStart = fetchWindowStart(this.today);
+        const { fetchFrom } = this.window;
         let result = [];
         for (const repo of this.repositories) {
             // Releases are returned newest first; drafts have no published_at.
             const payloads = await this.client.paginate('GET /repos/{owner}/{repo}/releases', { owner: this.owner, repo }, {
-                until: payload => isBeforeWindow(windowStart, payload.published_at ?? payload.created_at)
+                until: payload => isBeforeWindow(fetchFrom, payload.published_at ?? payload.created_at)
             });
             result = result.concat(payloads.map(payload => toRelease(this.owner, repo, payload)));
         }
@@ -39327,51 +39321,64 @@ function isoTimestamp(ms) {
     return `${new Date(ms).toISOString().slice(0, 19)}Z`;
 }
 
+;// CONCATENATED MODULE: ./src/MetricsWindow.ts
+const ONE_DAY = 24 * 60 * 60 * 1000;
+// Functions rather than constants so the values are not static mutants for Stryker.
+function metricWindowDays() {
+    return 30;
+}
+function defaultLookBackDays() {
+    return 30;
+}
+function metricsWindow(now, lookBackDays = defaultLookBackDays()) {
+    const to = now.valueOf();
+    const from = to - metricWindowDays() * ONE_DAY;
+    return { now: to, from, to, fetchFrom: from - lookBackDays * ONE_DAY };
+}
+// The one predicate every metric uses: from <= at < to.
+function inWindow(window, at) {
+    return window.from <= at && at < window.to;
+}
+
 ;// CONCATENATED MODULE: ./src/DeployFrequency.ts
-//
+
 
 // The number of milliseconds in one day
-const ONE_DAY = 1000 * 60 * 60 * 24;
+const DeployFrequency_ONE_DAY = 1000 * 60 * 60 * 24;
 class DeployFrequency {
     log = [];
-    today = new Date();
-    rList = new Array();
+    rList;
+    window;
     getLog() {
         return this.log;
     }
-    constructor(releases, dateString = null) {
-        this.rList = releases;
-        if (this.rList === null || this.rList.length === 0) {
+    constructor(releases, options) {
+        if (releases === null || releases.length === 0) {
             throw new Error('Empty release list');
         }
-        if (dateString !== null) {
-            this.today = new Date(dateString);
-        }
+        this.rList = releases;
+        this.window = options.window;
     }
+    // Releases published in the last seven days of the window.
     weekly() {
-        let releaseCount = 0;
-        for (const release of this.rList) {
-            const relDate = new Date(release.publishedAt);
-            if (this.days_between(this.today, relDate) < 8) {
-                this.log.push(this.entry(release));
-                releaseCount++;
-            }
-        }
-        return releaseCount;
+        return this.count({ from: this.window.to - 7 * DeployFrequency_ONE_DAY, to: this.window.to });
     }
     monthly() {
+        return this.count(this.window);
+    }
+    // Releases per week over the 30-day window, two decimals.
+    rate() {
+        return (Math.round(this.monthly() * 700) / 3000).toFixed(2);
+    }
+    count(window) {
         let releaseCount = 0;
         for (const release of this.rList) {
-            const relDate = new Date(release.publishedAt);
-            if (this.days_between(this.today, relDate) < 31) {
+            if (inWindow(window, release.publishedAt)) {
                 this.log.push(this.entry(release));
                 releaseCount++;
             }
         }
         return releaseCount;
-    }
-    rate() {
-        return (Math.round(this.monthly() * 700) / 3000).toFixed(2);
     }
     entry(release) {
         return {
@@ -39381,30 +39388,25 @@ class DeployFrequency {
             name: release.name
         };
     }
-    days_between(date1, date2) {
-        // Calculate the difference in milliseconds
-        const differenceMs = Math.abs(date1.valueOf() - date2.valueOf());
-        // Convert back to days and return
-        return Math.round(differenceMs / ONE_DAY);
-    }
 }
 
 ;// CONCATENATED MODULE: ./src/ChangeFailureRate.ts
 
+
 class ChangeFailureRate {
-    today;
     issues;
     releases;
     repos;
     bugLabel;
     log = [];
-    constructor(issues, releases, today = null, bugLabel = 'bug') {
-        this.today = today === null ? new Date() : today;
+    window;
+    constructor(issues, releases, options) {
+        this.window = options.window;
         this.issues = issues;
-        this.bugLabel = bugLabel;
+        this.bugLabel = options.bugLabel ?? 'bug';
         this.releases = releases
             .sort((a, b) => (a.publishedAt < b.publishedAt ? -1 : 1))
-            .filter(r => r.publishedAt > this.today.valueOf() - 31 * 24 * 60 * 60 * 1000);
+            .filter(r => inWindow(this.window, r.publishedAt));
         this.repos = [];
     }
     getBugs() {
@@ -39429,7 +39431,7 @@ class ChangeFailureRate {
                 this.repos.push(bug.repo);
             }
         }
-        const now = Date.now();
+        const now = this.window.to;
         let failedDeploys = 0;
         for (const repo of this.repos) {
             const releasesForRepo = this.releases.filter(r => r.repo === repo);
@@ -39469,15 +39471,15 @@ class IssuesAdapter {
     client;
     owner;
     repositories;
-    today;
-    constructor(client, owner, repositories) {
+    window;
+    constructor(client, owner, repositories, window) {
         this.client = client;
         this.owner = owner;
         this.repositories = repositories;
-        this.today = new Date();
+        this.window = window;
     }
     async GetAllIssuesLastMonth() {
-        const windowStart = fetchWindowStart(this.today);
+        const { fetchFrom } = this.window;
         let result = [];
         for (const repo of this.repositories) {
             // /issues honours `since`; the predicate is a belt-and-braces stop.
@@ -39485,8 +39487,8 @@ class IssuesAdapter {
                 owner: this.owner,
                 repo,
                 state: 'all',
-                since: new Date(windowStart).toISOString()
-            }, { until: payload => isBeforeWindow(windowStart, payload.updated_at) });
+                since: new Date(fetchFrom).toISOString()
+            }, { until: payload => isBeforeWindow(fetchFrom, payload.updated_at) });
             result = result.concat(payloads.map(payload => toIssue(this.owner, repo, payload)));
         }
         return result;
@@ -39495,22 +39497,18 @@ class IssuesAdapter {
 
 ;// CONCATENATED MODULE: ./src/MeanTimeToRestore.ts
 
+
 const MeanTimeToRestore_ONE_DAY = 1000 * 60 * 60 * 24;
 class MeanTimeToRestore {
-    today;
     issues;
     releases; // Sorted ascending by publishedAt
     bugLabel;
     log = [];
-    constructor(issues, releases, today = null, bugLabel = 'bug') {
-        if (today === null) {
-            this.today = new Date();
-        }
-        else {
-            this.today = today;
-        }
+    window;
+    constructor(issues, releases, options) {
+        this.window = options.window;
         this.issues = issues;
-        this.bugLabel = bugLabel;
+        this.bugLabel = options.bugLabel ?? 'bug';
         if (releases === null || releases.length === 0) {
             throw new Error('Empty release list');
         }
@@ -39541,7 +39539,7 @@ class MeanTimeToRestore {
         const bugs = [];
         for (const issue of this.issues) {
             if (issue.labels.includes(this.bugLabel) &&
-                issue.createdAt > this.today.getTime() - 30 * MeanTimeToRestore_ONE_DAY) {
+                inWindow(this.window, issue.createdAt)) {
                 bugs.push(issue);
             }
         }
@@ -39615,15 +39613,15 @@ class PullRequestsAdapter {
     client;
     owner;
     repositories;
-    today;
-    constructor(client, owner, repositories) {
+    window;
+    constructor(client, owner, repositories, window) {
         this.client = client;
         this.owner = owner;
         this.repositories = repositories;
-        this.today = new Date();
+        this.window = window;
     }
     async GetAllPRsLastMonth() {
-        const windowStart = fetchWindowStart(this.today);
+        const { fetchFrom } = this.window;
         let result = [];
         for (const repo of this.repositories) {
             // merged_at <= updated_at, so newest-updated-first is a safe superset.
@@ -39633,7 +39631,7 @@ class PullRequestsAdapter {
                 state: 'closed',
                 sort: 'updated',
                 direction: 'desc'
-            }, { until: payload => isBeforeWindow(windowStart, payload.updated_at) });
+            }, { until: payload => isBeforeWindow(fetchFrom, payload.updated_at) });
             result = result.concat(payloads.map(payload => toPullRequest(this.owner, repo, payload)));
         }
         return result;
@@ -39658,6 +39656,7 @@ class CommitsAdapter {
 
 ;// CONCATENATED MODULE: ./src/LeadTime.ts
 
+
 // A function rather than constants so the values are not static mutants for Stryker.
 function defaultLeadTimeLimits() {
     return { maxCommitFetches: 200, concurrency: 4 };
@@ -39680,23 +39679,16 @@ class LeadTime {
     log = [];
     pulls;
     releases;
-    today;
     commitsAdapter;
     logger;
     limits;
-    constructor(pulls, releases, commitsAdapter, today = null, logger = { warning: () => undefined }, limits = defaultLeadTimeLimits()) {
-        if (today === null) {
-            this.today = new Date();
-        }
-        else {
-            this.today = today;
-        }
-        const since = this.today.valueOf() - 31 * LeadTime_ONE_DAY;
-        this.pulls = pulls.filter((p) => p.mergedAt !== null && p.mergedAt > since);
+    constructor(pulls, releases, commitsAdapter, options) {
+        const { window } = options;
+        this.pulls = pulls.filter((p) => p.mergedAt !== null && inWindow(window, p.mergedAt));
         this.releases = releases;
         this.commitsAdapter = commitsAdapter;
-        this.logger = logger;
-        this.limits = limits;
+        this.logger = options.logger ?? { warning: () => undefined };
+        this.limits = options.limits ?? defaultLeadTimeLimits();
     }
     getLog() {
         return this.log;
@@ -39783,6 +39775,7 @@ function serializeLog(entries, limits = defaultLogLimits()) {
 }
 
 ;// CONCATENATED MODULE: ./src/main.ts
+
 
 
 
@@ -39890,15 +39883,20 @@ function parseInputs(core, context, env) {
 }
 async function run({ inputs, client, core }) {
     const { owner, repositories, logging, filtered, bugLabel } = inputs;
+    // The only clock read in src/: every adapter and metric shares this window.
+    const window = metricsWindow(new Date());
     // Fetch everything first so an API failure aborts before any output is set.
-    const releaseList = await new ReleaseAdapter(client, owner, repositories).GetAllReleasesLastMonth();
-    const pulls = await new PullRequestsAdapter(client, owner, repositories).GetAllPRsLastMonth();
-    const issueList = await new IssuesAdapter(client, owner, repositories).GetAllIssuesLastMonth();
-    const df = new DeployFrequency(releaseList);
-    const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client), null, core);
+    const releaseList = await new ReleaseAdapter(client, owner, repositories, window).GetAllReleasesLastMonth();
+    const pulls = await new PullRequestsAdapter(client, owner, repositories, window).GetAllPRsLastMonth();
+    const issueList = await new IssuesAdapter(client, owner, repositories, window).GetAllIssuesLastMonth();
+    const df = new DeployFrequency(releaseList, { window });
+    const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client), {
+        window,
+        logger: core
+    });
     const leadTime = await lt.getLeadTime(filtered);
-    const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel);
-    const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel);
+    const cfr = new ChangeFailureRate(issueList, releaseList, { window, bugLabel });
+    const mttr = new MeanTimeToRestore(issueList, releaseList, { window, bugLabel });
     const outputs = {
         'deploy-rate': df.rate(),
         ...(logging && { 'deploy-rate-log': serializeLog(df.getLog()) }),

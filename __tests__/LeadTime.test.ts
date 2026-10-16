@@ -6,7 +6,7 @@ import type {Release} from '../src/types/Release'
 import type {RepoKey} from '../src/types/RepoKey'
 import type {ICommitsAdapter} from '../src/interfaces/ICommitsAdapter'
 import {LeadTime, defaultLeadTimeLimits} from '../src/LeadTime'
-import {commit, pull, release, ts} from './helpers/domain'
+import {commit, pull, release, ts, windowAt} from './helpers/domain'
 
 const DMA = 'stenjo/devops-metrics-action'
 const OTHER = 'stenjo/other-repo'
@@ -23,7 +23,7 @@ describe('LeadTime should', () => {
       pulls,
       [release('2023-04-30T17:50:53Z')],
       commitsAdapter,
-      new Date()
+      {window: windowAt()}
     )
 
     const leadTime = await lt.getLeadTime()
@@ -37,7 +37,7 @@ describe('LeadTime should', () => {
       pulls,
       [release('2023-04-30T17:50:53Z')],
       commitsAdapter,
-      new Date('2023-05-01')
+      {window: windowAt('2023-05-01')}
     )
 
     const leadTime = await lt.getLeadTime()
@@ -48,7 +48,9 @@ describe('LeadTime should', () => {
   it('return 0 on no releases', async () => {
     const pulls = [pull({mergedAt: ts('2023-04-28T17:50:53Z')})]
 
-    const lt = new LeadTime(pulls, [], commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, [], commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -61,7 +63,7 @@ describe('LeadTime should', () => {
       pulls,
       [release('2023-04-30T17:50:53Z')],
       commitsAdapter,
-      new Date('2023-05-01')
+      {window: windowAt('2023-05-01')}
     )
 
     const leadTime = await lt.getLeadTime()
@@ -75,12 +77,9 @@ describe('LeadTime should', () => {
     commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => {
       return Promise.resolve([commit('2023-04-22T17:50:53Z')])
     })
-    const lt = new LeadTime(
-      pullRequests,
-      releases,
-      commitsAdapter,
-      new Date('2023-05-01')
-    )
+    const lt = new LeadTime(pullRequests, releases, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -101,12 +100,9 @@ describe('LeadTime should', () => {
     commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => {
       return Promise.resolve([commit('2023-04-22T17:50:53Z')])
     })
-    const lt = new LeadTime(
-      pullRequests,
-      releases,
-      commitsAdapter,
-      new Date('2023-05-01')
-    )
+    const lt = new LeadTime(pullRequests, releases, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -120,12 +116,9 @@ describe('LeadTime should', () => {
   it('return 0 on too old pull-requests', async () => {
     const pulls = [pull({mergedAt: ts('2023-04-29T17:50:53Z')})]
     const rels = [release('2023-04-30T17:50:53Z')]
-    const lt = new LeadTime(
-      pulls,
-      rels,
-      commitsAdapter,
-      new Date('2023-06-29T17:50:53Z')
-    )
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-06-29T17:50:53Z')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -142,7 +135,9 @@ describe('LeadTime should', () => {
       ])
     })
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -165,7 +160,9 @@ describe('LeadTime should', () => {
       ])
     })
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -184,7 +181,9 @@ describe('LeadTime should', () => {
       release('2023-04-30T17:50:53Z'),
       release('2023-04-02T17:50:53Z')
     ]
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -205,7 +204,9 @@ describe('LeadTime should', () => {
       release('2023-04-02T17:50:53Z')
     ]
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -224,7 +225,9 @@ describe('LeadTime should', () => {
       release('2023-04-02T17:50:53Z')
     ]
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -248,7 +251,9 @@ describe('LeadTime should', () => {
       release('2023-04-02T17:50:53Z', DMA)
     ]
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
 
     const leadTime = await lt.getLeadTime()
 
@@ -266,25 +271,19 @@ describe('LeadTime should', () => {
       release('2023-05-01T17:50:53Z', 'o/api')
     ]
 
-    const unreleased = new LeadTime(
-      pulls,
-      onlyGateway,
-      commitsAdapter,
-      new Date('2023-05-02')
-    )
-    const released = new LeadTime(
-      pulls,
-      both,
-      commitsAdapter,
-      new Date('2023-05-02')
-    )
+    const unreleased = new LeadTime(pulls, onlyGateway, commitsAdapter, {
+      window: windowAt('2023-05-02')
+    })
+    const released = new LeadTime(pulls, both, commitsAdapter, {
+      window: windowAt('2023-05-02')
+    })
 
     expect(await unreleased.getLeadTime()).toBe(0)
     expect(await released.getLeadTime()).toBe(9) // 1/5 - 22/4, not 29/4
   })
 
   it('get an empty log of releases or pulls', async () => {
-    const lt = new LeadTime([], [], commitsAdapter)
+    const lt = new LeadTime([], [], commitsAdapter, {window: windowAt()})
 
     expect(lt.getLog().length).toBe(0)
   })
@@ -306,7 +305,9 @@ describe('LeadTime should', () => {
       release('2023-04-02T17:50:53Z', DMA, 'v0.0.1')
     ]
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
     await lt.getLeadTime()
 
     expect(lt.getLog().map(l => l.release)).toEqual(['v0.1.0', 'v1.1.0'])
@@ -340,7 +341,9 @@ describe('LeadTime should', () => {
       release('2023-04-02T17:50:53Z', DMA, 'v0.0.1')
     ]
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
     await lt.getLeadTime()
 
     const log = lt.getLog()
@@ -376,7 +379,9 @@ describe('LeadTime should', () => {
       release('2023-04-02T17:50:53Z', DMA, 'v0.0.1')
     ]
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
     const leadTime = await lt.getLeadTime(true)
 
     const log = lt.getLog()
@@ -414,7 +419,9 @@ describe('LeadTime should', () => {
       release('2023-04-02T17:50:53Z', DMA, 'v0.0.1')
     ]
 
-    const lt = new LeadTime(pulls, rels, commitsAdapter, new Date('2023-05-01'))
+    const lt = new LeadTime(pulls, rels, commitsAdapter, {
+      window: windowAt('2023-05-01')
+    })
     const leadTime = await lt.getLeadTime(true)
 
     const log = lt.getLog()
@@ -435,39 +442,51 @@ describe('LeadTime should', () => {
     const adapter: CommitsAdapter = new CommitsAdapter(new GitHubClient())
     adapter.getCommits = vi.fn(getCommits)
 
-    it('exclude a pull merged exactly 31 days ago', async () => {
-      const pulls = [{...mainPull, mergedAt: ts('2023-03-31T00:00:00Z')}]
-      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+    it('exclude a pull merged 1 ms before the window starts', async () => {
+      const pulls = [{...mainPull, mergedAt: ts('2023-03-31T23:59:59.999Z')}]
+      const lt = new LeadTime(pulls, [repoRelease], adapter, {
+        window: windowAt(today)
+      })
 
       expect(await lt.getLeadTime()).toBe(0)
       expect(lt.getLog()).toEqual([])
     })
 
-    it('include a pull merged just under 31 days ago', async () => {
-      const pulls = [{...mainPull, mergedAt: ts('2023-03-31T00:00:01Z')}]
-      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+    it('include a pull merged exactly 30 days ago', async () => {
+      const pulls = [{...mainPull, mergedAt: ts('2023-04-01T00:00:00Z')}]
+      const lt = new LeadTime(pulls, [repoRelease], adapter, {
+        window: windowAt(today)
+      })
 
       expect(await lt.getLeadTime()).toBeGreaterThan(0)
     })
 
     it('not write the filtered log line when there are no pulls', async () => {
-      const lt = new LeadTime([], [repoRelease], adapter, today)
+      const lt = new LeadTime([], [repoRelease], adapter, {
+        window: windowAt(today)
+      })
 
       expect(await lt.getLeadTime(true)).toBe(0)
       expect(lt.getLog()).toEqual([])
     })
 
     it('not write the filtered log line when there are no releases', async () => {
-      const lt = new LeadTime([mainPull], [], adapter, today)
+      const lt = new LeadTime([mainPull], [], adapter, {
+        window: windowAt(today)
+      })
 
       expect(await lt.getLeadTime(true)).toBe(0)
       expect(lt.getLog()).toEqual([])
     })
 
     it('log only pull records whether filtered or not', async () => {
-      const filtered = new LeadTime([mainPull], [repoRelease], adapter, today)
+      const filtered = new LeadTime([mainPull], [repoRelease], adapter, {
+        window: windowAt(today)
+      })
       await filtered.getLeadTime(true)
-      const unfiltered = new LeadTime([mainPull], [repoRelease], adapter, today)
+      const unfiltered = new LeadTime([mainPull], [repoRelease], adapter, {
+        window: windowAt(today)
+      })
       await unfiltered.getLeadTime(false)
 
       expect(filtered.getLog().map(l => l.kind)).toEqual(['pull'])
@@ -479,7 +498,7 @@ describe('LeadTime should', () => {
         [mainPull, {...mainPull, mergedAt: null}],
         [repoRelease],
         adapter,
-        today
+        {window: windowAt(today)}
       )
 
       expect(lt.pulls).toEqual([mainPull])
@@ -487,14 +506,18 @@ describe('LeadTime should', () => {
 
     it('ignore a pull not merged to main even when releases exist', async () => {
       const pulls = [{...mainPull, baseRef: 'develop'}]
-      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+      const lt = new LeadTime(pulls, [repoRelease], adapter, {
+        window: windowAt(today)
+      })
 
       expect(await lt.getLeadTime()).toBe(0)
     })
 
     it('ignore a release published at the exact merge time', async () => {
       const rel = {...repoRelease, publishedAt: mainPull.mergedAt as number}
-      const lt = new LeadTime([mainPull], [rel], adapter, today)
+      const lt = new LeadTime([mainPull], [rel], adapter, {
+        window: windowAt(today)
+      })
 
       expect(await lt.getLeadTime()).toBe(0)
     })
@@ -506,7 +529,9 @@ describe('LeadTime should', () => {
         {...mainPull, title: 'feat: real'},
         {...mainPull, title: 'refactor: feat'}
       ]
-      const lt = new LeadTime(pulls, [repoRelease], adapter, today)
+      const lt = new LeadTime(pulls, [repoRelease], adapter, {
+        window: windowAt(today)
+      })
       await lt.getLeadTime(true)
 
       expect(lt.getLog().map(l => [l.at, l.title])).toEqual([
@@ -521,7 +546,9 @@ describe('LeadTime should', () => {
         commit('2023-04-20T00:00:00Z', 'first'),
         commit('2023-04-22T00:00:00Z', 'middle')
       ])
-      const lt = new LeadTime([mainPull], [repoRelease], adapter, today)
+      const lt = new LeadTime([mainPull], [repoRelease], adapter, {
+        window: windowAt(today)
+      })
 
       const leadTime = await lt.getLeadTime()
 
@@ -634,8 +661,7 @@ describe('LeadTime should', () => {
         pulls(201),
         [repoRelease],
         {getCommits},
-        today,
-        logger
+        {window: windowAt(today), logger}
       )
 
       const leadTime = await lt.getLeadTime()
@@ -660,9 +686,11 @@ describe('LeadTime should', () => {
         pulls(3),
         [repoRelease],
         {getCommits},
-        today,
-        logger,
-        {maxCommitFetches: 3, concurrency: 4}
+        {
+          window: windowAt(today),
+          logger,
+          limits: {maxCommitFetches: 3, concurrency: 4}
+        }
       )
 
       await lt.getLeadTime()
@@ -685,11 +713,13 @@ describe('LeadTime should', () => {
         input,
         [repoRelease],
         {getCommits},
-        today,
-        logger,
         {
-          maxCommitFetches: 2,
-          concurrency: 4
+          window: windowAt(today),
+          logger,
+          limits: {
+            maxCommitFetches: 2,
+            concurrency: 4
+          }
         }
       )
 
@@ -702,14 +732,11 @@ describe('LeadTime should', () => {
     it('keep the sampled pull requests in input order and skip the rest', async () => {
       const logger = {warning: vi.fn()}
       const tracker = trackingAdapter()
-      const lt = new LeadTime(
-        pulls(5),
-        [repoRelease],
-        tracker.adapter,
-        today,
+      const lt = new LeadTime(pulls(5), [repoRelease], tracker.adapter, {
+        window: windowAt(today),
         logger,
-        {maxCommitFetches: 3, concurrency: 1}
-      )
+        limits: {maxCommitFetches: 3, concurrency: 1}
+      })
 
       const run = lt.getLeadTime()
       await settle()
@@ -733,7 +760,9 @@ describe('LeadTime should', () => {
 
     it('fetch commits with at most 4 requests in flight by default', async () => {
       const tracker = trackingAdapter()
-      const lt = new LeadTime(pulls(10), [repoRelease], tracker.adapter, today)
+      const lt = new LeadTime(pulls(10), [repoRelease], tracker.adapter, {
+        window: windowAt(today)
+      })
 
       const run = lt.getLeadTime()
       await settle()
@@ -754,14 +783,10 @@ describe('LeadTime should', () => {
 
     it('honour an injected concurrency limit', async () => {
       const tracker = trackingAdapter()
-      const lt = new LeadTime(
-        pulls(5),
-        [repoRelease],
-        tracker.adapter,
-        today,
-        undefined,
-        {maxCommitFetches: 200, concurrency: 2}
-      )
+      const lt = new LeadTime(pulls(5), [repoRelease], tracker.adapter, {
+        window: windowAt(today),
+        limits: {maxCommitFetches: 200, concurrency: 2}
+      })
 
       const run = lt.getLeadTime()
       await settle()
@@ -775,14 +800,10 @@ describe('LeadTime should', () => {
 
     it('keep log order by pull request even when fetches finish out of order', async () => {
       const tracker = trackingAdapter()
-      const lt = new LeadTime(
-        pulls(4),
-        [repoRelease],
-        tracker.adapter,
-        today,
-        undefined,
-        {maxCommitFetches: 200, concurrency: 4}
-      )
+      const lt = new LeadTime(pulls(4), [repoRelease], tracker.adapter, {
+        window: windowAt(today),
+        limits: {maxCommitFetches: 200, concurrency: 4}
+      })
 
       const run = lt.getLeadTime()
       await settle()
@@ -806,7 +827,12 @@ describe('LeadTime should', () => {
       const getCommits = vi.fn(async (): Promise<Commit[]> => {
         throw new Error('boom')
       })
-      const lt = new LeadTime(pulls(3), [repoRelease], {getCommits}, today)
+      const lt = new LeadTime(
+        pulls(3),
+        [repoRelease],
+        {getCommits},
+        {window: windowAt(today)}
+      )
 
       await expect(lt.getLeadTime()).rejects.toThrow('boom')
     })

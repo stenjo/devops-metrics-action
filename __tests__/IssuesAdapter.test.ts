@@ -5,9 +5,11 @@ import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
 import type {Issue} from '../src/types/Issue'
 import type {GitHubIssuePayload} from '../src/github/payloads'
 import {issuePayload} from './helpers/payloads'
+import {windowAt} from './helpers/domain'
 
-// Window start is 61 days earlier: 2023-12-31T12:00:00Z.
+// fetchFrom is 60 days earlier (30-day window + 30-day look-back): 2024-01-01T12:00:00Z.
 const TODAY = new Date('2024-03-01T12:00:00Z')
+const WINDOW = windowAt(TODAY)
 const IN_WINDOW = '2024-02-01T00:00:00Z'
 const BEFORE_WINDOW = '2023-12-01T00:00:00Z'
 
@@ -42,15 +44,19 @@ describe('Issue Adapter should', () => {
   })
 
   it('return paged values', async () => {
-    const r = new IssuesAdapter(new GitHubClient(), 'test-owner', ['project1'])
-    r.today = TODAY
+    const r = new IssuesAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const issues: Issue[] = await r.GetAllIssuesLastMonth()
 
     expect(issues.length).toBe(150)
   })
 
-  it('request issues since 61 days back with auth and api-version headers', async () => {
+  it('request issues since 60 days back with auth and api-version headers', async () => {
     const seen: Request[] = []
     server.use(
       http.get(
@@ -66,9 +72,9 @@ describe('Issue Adapter should', () => {
     const r = new IssuesAdapter(
       new GitHubClient({token: 'my-token'}),
       'test-owner',
-      ['project1']
+      ['project1'],
+      WINDOW
     )
-    r.today = TODAY
 
     await r.GetAllIssuesLastMonth()
 
@@ -82,7 +88,7 @@ describe('Issue Adapter should', () => {
       'state'
     ])
     expect(url.searchParams.get('state')).toBe('all')
-    expect(url.searchParams.get('since')).toBe('2023-12-31T12:00:00.000Z')
+    expect(url.searchParams.get('since')).toBe('2024-01-01T12:00:00.000Z')
     expect(url.searchParams.get('per_page')).toBe('100')
     expect(url.searchParams.get('page')).toBe('1')
     expect(seen[0].headers.get('authorization')).toBe('token my-token')
@@ -108,8 +114,12 @@ describe('Issue Adapter should', () => {
         }
       )
     )
-    const r = new IssuesAdapter(new GitHubClient(), 'test-owner', ['project1'])
-    r.today = TODAY
+    const r = new IssuesAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const issues = await r.GetAllIssuesLastMonth()
 
@@ -132,8 +142,12 @@ describe('Issue Adapter should', () => {
         ])
       )
     )
-    const r = new IssuesAdapter(new GitHubClient(), 'test-owner', ['project1'])
-    r.today = TODAY
+    const r = new IssuesAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const issues = await r.GetAllIssuesLastMonth()
 
@@ -155,8 +169,12 @@ describe('Issue Adapter should', () => {
         }
       )
     )
-    const r = new IssuesAdapter(new GitHubClient(), 'test-owner', ['project1'])
-    r.today = TODAY
+    const r = new IssuesAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const issues = await r.GetAllIssuesLastMonth()
 
@@ -174,7 +192,12 @@ describe('Issue Adapter should', () => {
         () => new HttpResponse('access denied', {status: 401})
       )
     )
-    const r = new IssuesAdapter(new GitHubClient(), 'test-owner', ['project1'])
+    const r = new IssuesAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const error = await r.GetAllIssuesLastMonth().catch((e: unknown) => e)
 
