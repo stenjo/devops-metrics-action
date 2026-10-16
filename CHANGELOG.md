@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.1.0](https://github.com/stenjo/devops-metrics-action/compare/v2.0.0...v2.1.0) (2026-10-16)
+
+
+### Features
+
+* **client:** add Octokit throttling/retry and bound repositories, pages and commit fetches ([#487](https://github.com/stenjo/devops-metrics-action/issues/487)) ([73ad069](https://github.com/stenjo/devops-metrics-action/commit/73ad069557e30f79e92738b0146bd3edb25d5bce)), closes [#458](https://github.com/stenjo/devops-metrics-action/issues/458)
+* **logging:** include the repository in every log record ([#485](https://github.com/stenjo/devops-metrics-action/issues/485)) ([ab20b95](https://github.com/stenjo/devops-metrics-action/commit/ab20b9564634d52fd004e8ec1ce2e3a78b667640)), closes [#239](https://github.com/stenjo/devops-metrics-action/issues/239)
+* **metrics:** share one 30-day MetricsWindow across adapters and metrics ([#489](https://github.com/stenjo/devops-metrics-action/issues/489)) ([a180e5b](https://github.com/stenjo/devops-metrics-action/commit/a180e5b1e3143b840272a228383448f7d4284415)), closes [#460](https://github.com/stenjo/devops-metrics-action/issues/460)
+
+
+### Performance Improvements
+
+* **adapters:** stop paginating once results fall outside the metrics window ([#488](https://github.com/stenjo/devops-metrics-action/issues/488)) ([b1b4ce7](https://github.com/stenjo/devops-metrics-action/commit/b1b4ce7e72212a58c023a51a3314e0585530b581)), closes [#459](https://github.com/stenjo/devops-metrics-action/issues/459)
+
 ## [2.0.0](https://github.com/stenjo/devops-metrics-action/compare/v1.4.1...v2.0.0) (2026-10-16)
 
 
