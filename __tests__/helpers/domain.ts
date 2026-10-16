@@ -18,10 +18,10 @@ export function release(
 export function pull(overrides: Partial<PullRequest> = {}): PullRequest {
   return {
     repo: 'stenjo/devops-metrics-action',
+    number: 47,
     title: 'feat: something',
     mergedAt: ts('2023-04-28T17:50:53Z'),
     baseRef: 'main',
-    commitsUrl: '47',
     ...overrides
   }
 }

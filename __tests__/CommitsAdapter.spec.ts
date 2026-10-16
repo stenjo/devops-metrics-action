@@ -1,9 +1,12 @@
 import {CommitsAdapter} from '../src/CommitsAdapter'
 import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
+import {toPullRequest} from '../src/github/mappers'
 import {Octokit} from '@octokit/core'
-import {commitPayload} from './helpers/payloads'
+import {commitPayload, pullRequestPayload} from './helpers/payloads'
 
 vi.mock('@octokit/core')
+
+const route = 'GET /repos/{owner}/{repo}/pulls/{pull_number}/commits'
 
 describe('CommitsAdapter', () => {
   let adapter: CommitsAdapter
@@ -21,15 +24,18 @@ describe('CommitsAdapter', () => {
     vi.clearAllMocks()
   })
 
-  it('should fetch commits with the correct headers and map them', async () => {
-    const url = 'https://api.github.com/repos/owner/repo/commits'
+  it('should fetch commits through the route template with the correct headers and map them', async () => {
     mockRequest.mockResolvedValue({
       data: [commitPayload('2023-04-22T17:50:53Z', 'fix: it')]
     })
 
-    const commits = await adapter.getCommitsFromUrl(url)
+    const commits = await adapter.getCommits('owner/repo', 42)
 
-    expect(mockRequest).toHaveBeenCalledWith(url, {
+    expect(mockRequest).toHaveBeenCalledTimes(1)
+    expect(mockRequest).toHaveBeenCalledWith(route, {
+      owner: 'owner',
+      repo: 'repo',
+      pull_number: 42,
       headers: {'X-GitHub-Api-Version': '2022-11-28'}
     })
     expect(commits).toEqual([
@@ -37,8 +43,21 @@ describe('CommitsAdapter', () => {
     ])
   })
 
+  it('should never forward a commits_url from response data', async () => {
+    mockRequest.mockResolvedValue({data: []})
+    const pull = toPullRequest('o', 'r', {
+      ...pullRequestPayload({number: 9}),
+      commits_url: 'https://evil.example/repos/o/r/pulls/9/commits'
+    })
+
+    await adapter.getCommits(pull.repo, pull.number)
+
+    expect(mockRequest).toHaveBeenCalledTimes(1)
+    expect(mockRequest.mock.calls[0][0]).toBe(route)
+    expect(JSON.stringify(mockRequest.mock.calls)).not.toContain('evil.example')
+  })
+
   it('should handle missing or incorrect headers', async () => {
-    const url = 'https://api.github.com/repos/owner/repo/commits'
     mockRequest.mockImplementation((_url, options) => {
       if (
         !options.headers ||
@@ -52,42 +71,33 @@ describe('CommitsAdapter', () => {
     })
 
     // Test with missing headers
-    await expect(adapter.getCommitsFromUrl(url)).resolves.toBeDefined()
+    await expect(adapter.getCommits('owner/repo', 1)).resolves.toBeDefined()
 
     // Test with incorrect headers - the client wraps the error and rethrows it
     mockRequest.mockClear()
     mockRequest.mockImplementation(() => {
       throw new Error('Incorrect headers')
     })
-    await expect(adapter.getCommitsFromUrl(url)).rejects.toThrow(
-      `GitHub API request failed (unknown) for ${url}`
+    await expect(adapter.getCommits('owner/repo', 1)).rejects.toThrow(
+      `GitHub API request failed (unknown) for ${route}`
     )
   })
 
   it('should rethrow API failures as GitHubApiError without swallowing them', async () => {
-    const url = 'https://api.github.com/repos/owner/repo/commits'
     const cause = Object.assign(new Error('API call failed'), {status: 502})
     mockRequest.mockRejectedValue(cause)
 
-    const error = await adapter.getCommitsFromUrl(url).catch((e: unknown) => e)
+    const error = await adapter
+      .getCommits('owner/repo', 1)
+      .catch((e: unknown) => e)
 
     expect(error).toBeInstanceOf(GitHubApiError)
     expect(error).toMatchObject({
-      message: `GitHub API request failed (502) for ${url}`,
+      message: `GitHub API request failed (502) for ${route}`,
       status: 502,
-      route: url,
+      route,
       cause
     })
-  })
-
-  it('should reject on an empty or invalid URL', async () => {
-    const url = ''
-    mockRequest.mockRejectedValue(new Error('Invalid URL'))
-
-    await expect(adapter.getCommitsFromUrl(url)).rejects.toThrow(
-      'GitHub API request failed (unknown) for '
-    )
-    expect(mockRequest).toHaveBeenCalled()
   })
 
   it('should expose the injected client', () => {
@@ -97,10 +107,9 @@ describe('CommitsAdapter', () => {
   })
 
   it('should handle empty API response', async () => {
-    const url = 'https://api.github.com/repos/owner/repo/commits'
     mockRequest.mockResolvedValue({data: []})
 
-    const commits = await adapter.getCommitsFromUrl(url)
+    const commits = await adapter.getCommits('owner/repo', 1)
 
     expect(commits).toEqual([])
   })

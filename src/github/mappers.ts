@@ -38,10 +38,10 @@ export function toPullRequest(
 ): PullRequest {
   return {
     repo: repoKey(owner, repo),
+    number: payload.number,
     title: sanitizeText(payload.title),
     mergedAt: timestamp(payload.merged_at),
-    baseRef: payload.base.ref,
-    commitsUrl: payload.commits_url
+    baseRef: payload.base.ref
   }
 }
 

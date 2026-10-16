@@ -21,10 +21,9 @@ test('PullRequestsAdapter should', async () => {
   expect(pr.length).toBe(2)
   expect(pr[1]).toEqual({
     repo: 'stenjo/dora',
+    number: 69,
     title: 'feat: handle several repos',
     mergedAt: null,
-    baseRef: 'main',
-    commitsUrl:
-      'https://api.github.com/repos/stenjo/devops-metrics-action/pulls/69/commits'
+    baseRef: 'main'
   })
 })

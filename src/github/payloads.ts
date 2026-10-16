@@ -45,7 +45,6 @@ export interface GitHubPullRequestPayload {
   id: number
   number: number
   merged_at: string | null
-  commits_url: string
   base: {
     ref: string
     repo: {

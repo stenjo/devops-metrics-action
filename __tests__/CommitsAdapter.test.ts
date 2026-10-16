@@ -8,23 +8,23 @@ import type {GitHubCommitPayload} from '../src/github/payloads'
 
 const commitsUrl =
   'https://api.github.com/repos/stenjo/devops-metrics-action/pulls/69/commits'
+const route = 'GET /repos/{owner}/{repo}/pulls/{pull_number}/commits'
+const requested: string[] = []
 const server = setupServer(
-  http.get(
-    commitsUrl,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    ({request, params, cookies}) => {
-      const commits = JSON.parse(
-        fs.readFileSync('./__tests__/test-data/commits.json').toString()
-      ) as GitHubCommitPayload[]
-      return HttpResponse.json(commits)
-    }
-  )
+  http.get(commitsUrl, ({request}) => {
+    requested.push(request.url)
+    const commits = JSON.parse(
+      fs.readFileSync('./__tests__/test-data/commits.json').toString()
+    ) as GitHubCommitPayload[]
+    return HttpResponse.json(commits)
+  })
 )
 describe('Commit Adapter should', () => {
   beforeAll(() => server.listen())
 
   beforeEach(() => {
     vi.clearAllMocks()
+    requested.length = 0
   })
 
   afterAll(() => server.close())
@@ -36,8 +36,12 @@ describe('Commit Adapter should', () => {
   it('return unpaged values', async () => {
     const r = new CommitsAdapter(new GitHubClient())
 
-    const commits: Commit[] = await r.getCommitsFromUrl(commitsUrl)
+    const commits: Commit[] = await r.getCommits(
+      'stenjo/devops-metrics-action',
+      69
+    )
 
+    expect(requested).toEqual([commitsUrl])
     expect(commits.length).toBe(30)
     expect(commits[0]).toEqual({
       committedAt: +new Date('2023-04-22T20:41:12Z'),
@@ -54,11 +58,13 @@ describe('Commit Adapter should', () => {
     )
     const r = new CommitsAdapter(new GitHubClient())
 
-    const error = await r.getCommitsFromUrl(commitsUrl).catch((e: unknown) => e)
+    const error = await r
+      .getCommits('stenjo/devops-metrics-action', 69)
+      .catch((e: unknown) => e)
 
     expect(error).toBeInstanceOf(GitHubApiError)
     expect(error).toMatchObject({
-      message: `GitHub API request failed (401) for ${commitsUrl}`,
+      message: `GitHub API request failed (401) for ${route}`,
       status: 401
     })
   })

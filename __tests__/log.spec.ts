@@ -128,7 +128,7 @@ describe('serializeLog', () => {
 
 describe('log outputs end to end', () => {
   const commits: ICommitsAdapter = {
-    getCommitsFromUrl: async (): Promise<Commit[]> => [
+    getCommits: async (): Promise<Commit[]> => [
       toCommit(commitPayload('2023-04-20T00:00:00Z', INJECTION))
     ]
   }

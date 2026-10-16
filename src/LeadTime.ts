@@ -57,8 +57,9 @@ export class LeadTime {
         continue
       }
       const deployTime: number = laterReleases[0].publishedAt
-      const commits = await this.commitsAdapter.getCommitsFromUrl(
-        pull.commitsUrl
+      const commits = await this.commitsAdapter.getCommits(
+        pull.repo,
+        pull.number
       )
       const firstCommit = commits.sort(
         (a, b) => a.committedAt - b.committedAt

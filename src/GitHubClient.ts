@@ -41,7 +41,12 @@ export class GitHubClient {
     })
   }
 
+  // Only `METHOD /path` route templates are accepted, so the token can never
+  // be sent to a host chosen by a URL found in response data.
   async request<T>(route: string, params: RequestParams = {}): Promise<T> {
+    if (!/^[A-Z]+ \//.test(route)) {
+      throw new TypeError(`Refusing to request a non-route URL: ${route}`)
+    }
     try {
       const result = await this.octokit.request(route, {
         ...params,

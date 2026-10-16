@@ -16,7 +16,7 @@ test('fetches commits', async () => {
       ) as GitHubCommitPayload[]
   )
 
-  const cl = await adapter.getCommitsFromUrl('10')
+  const cl = await adapter.getCommits('stenjo/devops-metrics-action', 10)
 
   expect(cl.length).toBeGreaterThan(-1)
   expect(cl.length).toBe(30)
@@ -25,9 +25,7 @@ test('fetches commits', async () => {
 test('CommitsAdapter should', async () => {
   const ca = new CommitsAdapter(new GitHubClient({token: process.env.GH_TOKEN}))
 
-  const result = await ca.getCommitsFromUrl(
-    'https://api.github.com/repos/stenjo/devops-metrics-action/pulls/69/commits'
-  )
+  const result = await ca.getCommits('stenjo/devops-metrics-action', 69)
 
   expect(result).not.toBe(undefined)
   expect(result.length).toBeGreaterThan(7)

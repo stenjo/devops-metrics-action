@@ -53,25 +53,36 @@ describe('toRelease', () => {
 })
 
 describe('toPullRequest', () => {
-  it('maps title, merge time, base ref and commits url', () => {
+  it('maps number, title, merge time and base ref', () => {
     const pull = toPullRequest(
       'o',
       'r',
       pullRequestPayload({
+        number: 7,
         title: 'fix: a',
         merged_at: '2023-04-28T17:50:53Z',
-        commits_url: 'https://api/commits',
         base: {ref: 'develop', repo: {name: 'r'}}
       })
     )
 
     expect(pull).toEqual({
       repo: 'o/r',
+      number: 7,
       title: 'fix: a',
       mergedAt: +new Date('2023-04-28T17:50:53Z'),
-      baseRef: 'develop',
-      commitsUrl: 'https://api/commits'
+      baseRef: 'develop'
     })
+  })
+
+  it('does not carry response URLs into the domain object', () => {
+    const payload = {
+      ...pullRequestPayload(),
+      commits_url: 'https://evil.example/repos/o/r/pulls/1/commits'
+    }
+
+    expect(JSON.stringify(toPullRequest('o', 'r', payload))).not.toContain(
+      'evil.example'
+    )
   })
 
   it('maps an unmerged pull to mergedAt null', () => {

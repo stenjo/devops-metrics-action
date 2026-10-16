@@ -44,6 +44,23 @@ describe('GitHubClient', () => {
   })
 
   describe('request', () => {
+    it('refuses absolute URLs so the token never leaves the configured API host', async () => {
+      const client = new GitHubClient({token: 't'})
+
+      await expect(
+        client.request('https://evil.example/repos/o/r/pulls/1/commits')
+      ).rejects.toThrow(
+        new TypeError(
+          'Refusing to request a non-route URL: https://evil.example/repos/o/r/pulls/1/commits'
+        )
+      )
+      await expect(client.request('')).rejects.toThrow(TypeError)
+      await expect(
+        client.request('https://evil.example/?q=GET /repos')
+      ).rejects.toThrow(TypeError)
+      expect(mockRequest).not.toHaveBeenCalled()
+    })
+
     it('adds the api-version header and returns data', async () => {
       mockRequest.mockResolvedValue({data: [{id: 1}]})
       const client = new GitHubClient()

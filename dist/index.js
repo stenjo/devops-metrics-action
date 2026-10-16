@@ -37287,7 +37287,12 @@ class GitHubClient {
             ...(options.baseUrl !== undefined && { baseUrl: options.baseUrl })
         });
     }
+    // Only `METHOD /path` route templates are accepted, so the token can never
+    // be sent to a host chosen by a URL found in response data.
     async request(route, params = {}) {
+        if (!/^[A-Z]+ \//.test(route)) {
+            throw new TypeError(`Refusing to request a non-route URL: ${route}`);
+        }
         try {
             const result = await this.octokit.request(route, {
                 ...params,
@@ -37359,10 +37364,10 @@ function toRelease(owner, repo, payload) {
 function toPullRequest(owner, repo, payload) {
     return {
         repo: repoKey(owner, repo),
+        number: payload.number,
         title: sanitizeText(payload.title),
         mergedAt: timestamp(payload.merged_at),
-        baseRef: payload.base.ref,
-        commitsUrl: payload.commits_url
+        baseRef: payload.base.ref
     };
 }
 function toIssue(owner, repo, payload) {
@@ -37673,8 +37678,11 @@ class CommitsAdapter {
     constructor(client) {
         this.client = client;
     }
-    async getCommitsFromUrl(url) {
-        const payloads = await this.client.request(url);
+    // Built from identifiers on purpose: never forward a URL taken from a
+    // response body, as the token travels with whatever host it points at.
+    async getCommits(repo, pullNumber) {
+        const [owner, name] = repo.split('/');
+        const payloads = await this.client.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/commits', { owner, repo: name, pull_number: pullNumber });
         return payloads.map(toCommit);
     }
 }
@@ -37718,7 +37726,7 @@ class LeadTime {
                 continue;
             }
             const deployTime = laterReleases[0].publishedAt;
-            const commits = await this.commitsAdapter.getCommitsFromUrl(pull.commitsUrl);
+            const commits = await this.commitsAdapter.getCommits(pull.repo, pull.number);
             const firstCommit = commits.sort((a, b) => a.committedAt - b.committedAt)[0];
             const leadTime = (deployTime - firstCommit.committedAt) / LeadTime_ONE_DAY;
             leadTimes.push(leadTime);
