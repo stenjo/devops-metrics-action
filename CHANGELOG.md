@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.0.0](https://github.com/stenjo/devops-metrics-action/compare/v1.4.1...v2.0.0) (2026-10-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **security:** the `deploy-rate-log` and `lead-time-log` outputs are now JSON array strings instead of newline-separated `pull-> ... : <title>` / `release-> <name>:<date>` lines. Consumers that grep or split those lines must switch to `fromJSON` / `jq` on the record fields. The `Log is filtered - only feat and fix.` header line is gone.
+
+### Features
+
+* **cfr:** emit change-failure-rate-log with the failed releases and their bugs ([#480](https://github.com/stenjo/devops-metrics-action/issues/480)) ([9349420](https://github.com/stenjo/devops-metrics-action/commit/9349420761f24da26dedb1d2ca29f0d4be61fbe6))
+* **mttr:** emit mttr-log with the bugs and bounding releases behind the mean ([#481](https://github.com/stenjo/devops-metrics-action/issues/481)) ([cdbc4fb](https://github.com/stenjo/devops-metrics-action/commit/cdbc4fb3ecba8f83af92e59a871cb8d09e072e48))
+* **security:** emit *-log outputs as sanitized, bounded JSON ([#473](https://github.com/stenjo/devops-metrics-action/issues/473)) ([05da043](https://github.com/stenjo/devops-metrics-action/commit/05da0435c874121f2eac50a9f37213cfb7cae879)), closes [#455](https://github.com/stenjo/devops-metrics-action/issues/455)
+
+
+### Bug Fixes
+
+* **ci:** drop the removed package-name input from release-please v4 ([#483](https://github.com/stenjo/devops-metrics-action/issues/483)) ([3add1dc](https://github.com/stenjo/devops-metrics-action/commit/3add1dcbf0b737cd3eaad0472813634eba80d8f6))
+* **inputs:** validate owner, repo and bug-label at the action boundary ([#479](https://github.com/stenjo/devops-metrics-action/issues/479)) ([cf3ee97](https://github.com/stenjo/devops-metrics-action/commit/cf3ee975fbd37f06620d66944a4d109772a53f66)), closes [#462](https://github.com/stenjo/devops-metrics-action/issues/462)
+* **security:** fetch pull commits via route template, never commits_url ([#475](https://github.com/stenjo/devops-metrics-action/issues/475)) ([a047271](https://github.com/stenjo/devops-metrics-action/commit/a047271db58cb615757d7fe7eb269ea81f2cd59d))
+
 ## [1.4.1](https://github.com/stenjo/devops-metrics-action/compare/v1.4.0...v1.4.1) (2026-10-15)
 
 
