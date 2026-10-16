@@ -33,13 +33,25 @@ repo: [my-repository, my-other-repository]
 repo: my-repository my-other-repository
 ```
 
+Entries may also be given as `owner/repository`; the owner part must then
+match the `owner` input (case-insensitive).
+
+```yaml
+repo: stenjo/devops-metrics-action
+```
+
 Default `repo` value is repository where action is installed
 if no repositories are specified.
+
+Every repository name is validated against GitHub's naming rules (letters,
+digits, `_`, `.` and `-`, 1–100 characters, no `..`) before any API call is
+made. An invalid entry fails the run with a message naming the offending
+value.
 
 ### `owner`
 
 Owner of the repository. Default is current repository owner or organization.
-Only one is handled.
+Only one is handled. Validated with the same naming rules as `repo`.
 
 ### `token`
 
@@ -67,11 +79,16 @@ of the releases or pull requests behind the metric, see
 Set to true to filter pulls to only include feat and fix as basis for the lead
 time metric
 
+Both `logging` and `filtered` are enabled only by the literal string `true`.
+Any other value (such as `yes` or `1`) is treated as `false` and reported as a
+workflow warning.
+
 ### `bug-label`
 
 Name of the issue label that identifies a bug or incident. Issues carrying this
 label form the basis for the `change-failure-rate` and `mttr` metrics. Default
-is `bug`.
+is `bug`. The value is trimmed and must be at most 50 characters (GitHub's
+label limit); an empty value falls back to the default.
 
 ```yaml
 bug-label: incident

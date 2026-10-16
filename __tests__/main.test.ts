@@ -38,6 +38,7 @@ const throwingContext: ActionsContext = {
 function fakeCore(inputs: Record<string, string | null>): {
   getInput: Mock<(name: string) => string>
   info: Mock<(message: string) => void>
+  warning: Mock<(message: string) => void>
   setOutput: Mock<(name: string, value: unknown) => void>
   setSecret: Mock<(secret: string) => void>
 } {
@@ -46,6 +47,7 @@ function fakeCore(inputs: Record<string, string | null>): {
       name in inputs ? (inputs[name] as string) : ''
     ),
     info: vi.fn(),
+    warning: vi.fn(),
     setOutput: vi.fn(),
     setSecret: vi.fn()
   }
@@ -172,18 +174,158 @@ describe('parseInputs', () => {
     ])
   })
 
-  it('parses bracketed, newline and comma separated repos and trims them', () => {
+  it('parses bracketed, newline, comma and space separated repos and trims them', () => {
     const inputs = parseInputs(
       fakeCore({
         token: 't',
         owner: 'testOwner',
-        repo: '[ repo1 , repo2]\nrepo3,,'
+        repo: '[ repo1 , repo2]\nrepo3,,\trepo4 repo5'
       }),
       context,
       {}
     )
 
-    expect(inputs.repositories).toEqual(['repo1', 'repo2', 'repo3'])
+    expect(inputs.repositories).toEqual([
+      'repo1',
+      'repo2',
+      'repo3',
+      'repo4',
+      'repo5'
+    ])
+  })
+
+  it('accepts owner/repo entries and resolves them to the repo name', () => {
+    const fake = fakeCore({
+      token: 't',
+      owner: 'stenjo',
+      repo: 'stenjo/devops-metrics-action, other'
+    })
+
+    const inputs = parseInputs(fake, context, {})
+
+    expect(inputs.owner).toBe('stenjo')
+    expect(inputs.repositories).toEqual(['devops-metrics-action', 'other'])
+    expect(fake.info.mock.calls.map(c => c[0])).toEqual([
+      'stenjo/devops-metrics-action',
+      'stenjo/other',
+      '2 repositories registered.'
+    ])
+  })
+
+  it('matches the owner part of an owner/repo entry case-insensitively', () => {
+    const inputs = parseInputs(
+      fakeCore({token: 't', owner: 'StenJo', repo: 'stenjo/x'}),
+      context,
+      {}
+    )
+
+    expect(inputs.repositories).toEqual(['x'])
+  })
+
+  it('rejects an owner/repo entry whose owner conflicts with the owner input', () => {
+    expect(() =>
+      parseInputs(
+        fakeCore({token: 't', owner: 'stenjo', repo: 'someone-else/x'}),
+        context,
+        {}
+      )
+    ).toThrow(
+      new Error(
+        'Repo "someone-else/x" names owner "someone-else" but the owner input is "stenjo"'
+      )
+    )
+  })
+
+  it('rejects a repo entry with more than one slash', () => {
+    expect(() =>
+      parseInputs(
+        fakeCore({token: 't', owner: 'o', repo: 'a/b/c'}),
+        context,
+        {}
+      )
+    ).toThrow(
+      new Error('Invalid repo "a/b/c": expected "name" or "owner/name"')
+    )
+  })
+
+  it('rejects a path-traversal repo before any token handling', () => {
+    const fake = fakeCore({token: 't', owner: 'o', repo: '../../x'})
+
+    expect(() => parseInputs(fake, context, {})).toThrow(
+      new Error('Invalid repo "../../x": expected "name" or "owner/name"')
+    )
+    expect(fake.setSecret).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a..b', 'contains ".."'],
+    ['a~b', 'contains an invalid character'],
+    ['!abc', 'starts with an invalid character'],
+    ['abc!', 'ends with an invalid character'],
+    ['a\\b', 'contains a backslash'],
+    ['a%2F..%2Fb', 'contains percent-encoding'],
+    ['\u00e5rhus', 'contains non-ASCII letters'],
+    ['a'.repeat(101), 'is longer than 100 characters']
+  ])("rejects repo '%s' because it %s", repo => {
+    expect(() =>
+      parseInputs(fakeCore({token: 't', owner: 'o', repo}), context, {})
+    ).toThrow(
+      new Error(
+        `Invalid repo ${JSON.stringify(repo)}: GitHub names may only contain letters, digits, "_", "." and "-" (1-100 characters) and must not contain ".."`
+      )
+    )
+  })
+
+  it.each([
+    'abc',
+    'ABC',
+    '019',
+    'a_b',
+    'a.b',
+    'a-b',
+    '.github',
+    '-',
+    'a'.repeat(100)
+  ])("accepts repo '%s'", repo => {
+    const inputs = parseInputs(
+      fakeCore({token: 't', owner: 'o', repo}),
+      context,
+      {}
+    )
+
+    expect(inputs.repositories).toEqual([repo])
+  })
+
+  it.each([
+    ['..', 'contains ".."'],
+    ['own er', 'contains a space'],
+    ['own/er', 'contains a slash'],
+    ['own\ner', 'contains a newline'],
+    ['o'.repeat(101), 'is longer than 100 characters']
+  ])("rejects owner '%s' because it %s", owner => {
+    expect(() =>
+      parseInputs(fakeCore({token: 't', owner, repo: 'r'}), context, {})
+    ).toThrow(
+      new Error(
+        `Invalid owner ${JSON.stringify(owner)}: GitHub names may only contain letters, digits, "_", "." and "-" (1-100 characters) and must not contain ".."`
+      )
+    )
+  })
+
+  it('rejects the owner part of an owner/repo entry as an owner', () => {
+    expect(() =>
+      parseInputs(fakeCore({token: 't', owner: 'o', repo: '../r'}), context, {})
+    ).toThrow('Invalid owner ".."')
+  })
+
+  it('validates the context fallback owner and repo too', () => {
+    const badContext: ActionsContext = {
+      repo: {owner: 'ok', repo: 'bad~name'}
+    }
+
+    expect(() => parseInputs(fakeCore({token: 't'}), badContext, {})).toThrow(
+      'Invalid repo "bad~name"'
+    )
   })
 
   it('logs every repository and pluralises the count', () => {
@@ -216,7 +358,8 @@ describe('parseInputs', () => {
   it.each([
     ['true', true],
     ['false', false],
-    ['', false]
+    ['', false],
+    ['yes', false]
   ])("maps logging input '%s' to %s", (value, expected) => {
     const inputs = parseInputs(
       fakeCore({token: 't', repo: 'r', owner: 'o', logging: value}),
@@ -226,6 +369,47 @@ describe('parseInputs', () => {
 
     expect(inputs.logging).toBe(expected)
   })
+
+  it.each(['yes', '1', 'TRUE', 'True '])(
+    "warns about the unrecognised logging value '%s' and treats it as false",
+    value => {
+      const fake = fakeCore({token: 't', repo: 'r', owner: 'o', logging: value})
+
+      const inputs = parseInputs(fake, context, {})
+
+      expect(inputs.logging).toBe(false)
+      expect(fake.warning).toHaveBeenCalledExactlyOnceWith(
+        `Unrecognised value ${JSON.stringify(value)} for input 'logging': expected 'true' or 'false', treating it as false`
+      )
+    }
+  )
+
+  it("warns about an unrecognised filtered value naming the 'filtered' input", () => {
+    const fake = fakeCore({token: 't', repo: 'r', owner: 'o', filtered: 'on'})
+
+    parseInputs(fake, context, {})
+
+    expect(fake.warning).toHaveBeenCalledExactlyOnceWith(
+      `Unrecognised value "on" for input 'filtered': expected 'true' or 'false', treating it as false`
+    )
+  })
+
+  it.each(['true', 'false', ''])(
+    "does not warn for the recognised flag value '%s'",
+    value => {
+      const fake = fakeCore({
+        token: 't',
+        repo: 'r',
+        owner: 'o',
+        logging: value,
+        filtered: value
+      })
+
+      parseInputs(fake, context, {})
+
+      expect(fake.warning).not.toHaveBeenCalled()
+    }
+  )
 
   it("passes the 'bug-label' input through", () => {
     const fake = fakeCore({
@@ -241,14 +425,65 @@ describe('parseInputs', () => {
     expect(inputs.bugLabel).toBe('incident')
   })
 
-  it("defaults 'bug-label' to 'bug' when the input is empty", () => {
+  it("trims the 'bug-label' input", () => {
     const inputs = parseInputs(
-      fakeCore({token: 't', repo: 'r', owner: 'o'}),
+      fakeCore({
+        token: 't',
+        repo: 'r',
+        owner: 'o',
+        'bug-label': '  type: bug '
+      }),
+      context,
+      {}
+    )
+
+    expect(inputs.bugLabel).toBe('type: bug')
+  })
+
+  it.each([
+    ['empty', ''],
+    ['whitespace only', '  \t']
+  ])("defaults 'bug-label' to 'bug' when the input is %s", (_label, value) => {
+    const inputs = parseInputs(
+      fakeCore({token: 't', repo: 'r', owner: 'o', 'bug-label': value}),
       context,
       {}
     )
 
     expect(inputs.bugLabel).toBe('bug')
+  })
+
+  it("accepts a 50 character 'bug-label'", () => {
+    const label = 'b'.repeat(50)
+
+    const inputs = parseInputs(
+      fakeCore({token: 't', repo: 'r', owner: 'o', 'bug-label': label}),
+      context,
+      {}
+    )
+
+    expect(inputs.bugLabel).toBe(label)
+  })
+
+  it("rejects a 'bug-label' longer than 50 characters after trimming", () => {
+    const label = 'b'.repeat(51)
+
+    expect(() =>
+      parseInputs(
+        fakeCore({
+          token: 't',
+          repo: 'r',
+          owner: 'o',
+          'bug-label': ` ${label} `
+        }),
+        context,
+        {}
+      )
+    ).toThrow(
+      new Error(
+        `Invalid bug-label ${JSON.stringify(label)}: must be at most 50 characters`
+      )
+    )
   })
 })
 
