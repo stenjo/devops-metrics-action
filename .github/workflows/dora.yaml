@@ -6,6 +6,7 @@ on:
       - main
   schedule:
     - cron: '30 0 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,7 +28,7 @@ jobs:
           cache: npm
 
       - name: Dora metrics
-        uses: stenjo/devops-metrics-action@f1c62ea4014c6d11ae5c7bc26edf9c932918820d # v1.4.0
+        uses: stenjo/devops-metrics-action@113a5f73a92b8cd2b69047591eac8d0d9e1806b9 # v2.0.0
         id: dora
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -53,7 +54,7 @@ jobs:
       - name: Install jq
         uses: dcarbone/install-jq-action@4fcb5062d7ce9bc4382d1a352d19ba3ba2c317c1 # v4.0.1
 
-      # The *-log outputs are JSON arrays (v2+); parse them, never echo them.
+      # The *-log outputs are JSON arrays; parse them, never echo them.
       - name: Summarize metric logs
         env:
           DEPLOY_RATE_LOG: ${{ steps.dora.outputs.deploy-rate-log }}
@@ -61,10 +62,9 @@ jobs:
           CFR_LOG: ${{ steps.dora.outputs.change-failure-rate-log }}
           MTTR_LOG: ${{ steps.dora.outputs.mttr-log }}
         run: |
-          if ! jq -e 'type == "array"' <<< "$LEAD_TIME_LOG" > /dev/null 2>&1; then
-            echo "Log outputs are not JSON yet (action older than v2); skipping summary"
-            exit 0
-          fi
+          for log in "$DEPLOY_RATE_LOG" "$LEAD_TIME_LOG" "$CFR_LOG" "$MTTR_LOG"; do
+            jq -e 'type == "array"' <<< "$log" > /dev/null
+          done
           {
             echo '## Releases behind the deploy rate'
             echo
@@ -78,31 +78,21 @@ jobs:
             echo '| --- | --- | --- | --- |'
             jq -r '.[] | select(.kind == "pull") | "| \(.at) | \(.title | gsub("\\|"; "\\|")) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
             jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$LEAD_TIME_LOG"
+            echo
+            echo '## Releases behind the change failure rate'
+            echo
+            echo '| Published | Release | Bugs opened before next release |'
+            echo '| --- | --- | --- |'
+            jq -r '.[] | select(.kind == "failed-release") | "| \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title | gsub("\\|"; "\\|"))"] | join("<br>")) |"' <<< "$CFR_LOG"
+            jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$CFR_LOG"
+            echo
+            echo '## Bugs behind the mean time to restore'
+            echo
+            echo '| Bug | Opened | Closed | Release before | Release after | Days |'
+            echo '| --- | --- | --- | --- | --- | --- |'
+            jq -r '.[] | select(.kind == "restore") | "| #\(.number) \(.title | gsub("\\|"; "\\|")) | \(.createdAt) | \(.closedAt) | \(.releaseBefore) | \(.releaseAfter) | \(.restoreDays) |"' <<< "$MTTR_LOG"
+            jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$MTTR_LOG"
           } >> "$GITHUB_STEP_SUMMARY"
-          # Absent until the action pin includes the change-failure-rate-log output.
-          if jq -e 'type == "array"' <<< "$CFR_LOG" > /dev/null 2>&1; then
-            {
-              echo
-              echo '## Releases behind the change failure rate'
-              echo
-              echo '| Published | Release | Bugs opened before next release |'
-              echo '| --- | --- | --- |'
-              jq -r '.[] | select(.kind == "failed-release") | "| \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title | gsub("\\|"; "\\|"))"] | join("<br>")) |"' <<< "$CFR_LOG"
-              jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$CFR_LOG"
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-          # Absent until the action pin includes the mttr-log output.
-          if jq -e 'type == "array"' <<< "$MTTR_LOG" > /dev/null 2>&1; then
-            {
-              echo
-              echo '## Bugs behind the mean time to restore'
-              echo
-              echo '| Bug | Opened | Closed | Release before | Release after | Days |'
-              echo '| --- | --- | --- | --- | --- | --- |'
-              jq -r '.[] | select(.kind == "restore") | "| #\(.number) \(.title | gsub("\\|"; "\\|")) | \(.createdAt) | \(.closedAt) | \(.releaseBefore) | \(.releaseAfter) | \(.restoreDays) |"' <<< "$MTTR_LOG"
-              jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$MTTR_LOG"
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
 
       # Store Deploy Rate history
       - name: Load deploy rate history
@@ -165,6 +155,7 @@ jobs:
           fi
 
       - name: Commit DORA history data
+        if: github.ref_name == 'main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
