@@ -52,6 +52,8 @@ export function toIssue(
 ): Issue {
   return {
     repo: repoKey(owner, repo),
+    number: payload.number,
+    title: sanitizeText(payload.title),
     createdAt: +new Date(payload.created_at),
     closedAt: timestamp(payload.closed_at),
     labels: payload.labels.map(label => label.name)

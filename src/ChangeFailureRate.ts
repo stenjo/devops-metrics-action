@@ -1,6 +1,8 @@
 import type {Issue} from './types/Issue'
 import type {Release} from './types/Release'
 import type {RepoKey} from './types/RepoKey'
+import type {FailedReleaseLogEntry} from './types/LogEntry'
+import {isoTimestamp} from './types/Timestamp'
 
 export class ChangeFailureRate {
   today: Date
@@ -8,6 +10,7 @@ export class ChangeFailureRate {
   releases: Release[]
   repos: RepoKey[]
   bugLabel: string
+  log: FailedReleaseLogEntry[] = []
 
   constructor(
     issues: Issue[],
@@ -37,6 +40,10 @@ export class ChangeFailureRate {
     return bugs
   }
 
+  getLog(): FailedReleaseLogEntry[] {
+    return this.log
+  }
+
   Cfr(): number {
     if (this.issues.length === 0 || this.releases.length === 0) {
       return 0
@@ -48,26 +55,36 @@ export class ChangeFailureRate {
         this.repos.push(bug.repo)
       }
     }
-    const releaseDates = this.releases.map(release => {
-      return {published: release.publishedAt, repo: release.repo}
-    })
-    for (const repo of this.repos) {
-      releaseDates.push({published: Date.now(), repo})
-    }
+    const now = Date.now()
 
     let failedDeploys = 0
     for (const repo of this.repos) {
-      const releasesForRepo = releaseDates.filter(r => r.repo === repo)
-      for (let i = 0; i < releasesForRepo.length - 1; i++) {
-        if (
-          bugs.filter(
-            bug =>
-              bug.repo === repo &&
-              bug.createdAt > releasesForRepo[i].published &&
-              bug.createdAt < releasesForRepo[i + 1].published
-          ).length > 0
-        ) {
+      const releasesForRepo = this.releases.filter(r => r.repo === repo)
+      for (let i = 0; i < releasesForRepo.length; i++) {
+        const release = releasesForRepo[i]
+        // The interval after the latest release is closed by "now".
+        const nextAt =
+          i + 1 < releasesForRepo.length
+            ? releasesForRepo[i + 1].publishedAt
+            : now
+        const bugsInInterval = bugs.filter(
+          bug =>
+            bug.repo === repo &&
+            bug.createdAt > release.publishedAt &&
+            bug.createdAt < nextAt
+        )
+        if (bugsInInterval.length > 0) {
           failedDeploys += 1
+          this.log.push({
+            kind: 'failed-release',
+            at: isoTimestamp(release.publishedAt),
+            name: release.name,
+            bugs: bugsInInterval.map(bug => ({
+              number: bug.number,
+              title: bug.title,
+              createdAt: isoTimestamp(bug.createdAt)
+            }))
+          })
         }
       }
     }

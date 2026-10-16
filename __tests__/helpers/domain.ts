@@ -29,6 +29,8 @@ export function pull(overrides: Partial<PullRequest> = {}): PullRequest {
 export function issue(overrides: Partial<Issue> = {}): Issue {
   return {
     repo: 'stenjo/devops-metrics-action',
+    number: 1,
+    title: 'bug: something',
     createdAt: ts('2023-04-22T21:44:06Z'),
     closedAt: ts('2023-04-23T16:47:40Z'),
     labels: ['bug'],

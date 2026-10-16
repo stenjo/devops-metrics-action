@@ -37373,6 +37373,8 @@ function toPullRequest(owner, repo, payload) {
 function toIssue(owner, repo, payload) {
     return {
         repo: repoKey(owner, repo),
+        number: payload.number,
+        title: sanitizeText(payload.title),
         createdAt: +new Date(payload.created_at),
         closedAt: timestamp(payload.closed_at),
         labels: payload.labels.map(label => label.name)
@@ -37477,12 +37479,14 @@ class DeployFrequency {
 }
 
 ;// CONCATENATED MODULE: ./src/ChangeFailureRate.ts
+
 class ChangeFailureRate {
     today;
     issues;
     releases;
     repos;
     bugLabel;
+    log = [];
     constructor(issues, releases, today = null, bugLabel = 'bug') {
         this.today = today === null ? new Date() : today;
         this.issues = issues;
@@ -37501,6 +37505,9 @@ class ChangeFailureRate {
         }
         return bugs;
     }
+    getLog() {
+        return this.log;
+    }
     Cfr() {
         if (this.issues.length === 0 || this.releases.length === 0) {
             return 0;
@@ -37511,20 +37518,31 @@ class ChangeFailureRate {
                 this.repos.push(bug.repo);
             }
         }
-        const releaseDates = this.releases.map(release => {
-            return { published: release.publishedAt, repo: release.repo };
-        });
-        for (const repo of this.repos) {
-            releaseDates.push({ published: Date.now(), repo });
-        }
+        const now = Date.now();
         let failedDeploys = 0;
         for (const repo of this.repos) {
-            const releasesForRepo = releaseDates.filter(r => r.repo === repo);
-            for (let i = 0; i < releasesForRepo.length - 1; i++) {
-                if (bugs.filter(bug => bug.repo === repo &&
-                    bug.createdAt > releasesForRepo[i].published &&
-                    bug.createdAt < releasesForRepo[i + 1].published).length > 0) {
+            const releasesForRepo = this.releases.filter(r => r.repo === repo);
+            for (let i = 0; i < releasesForRepo.length; i++) {
+                const release = releasesForRepo[i];
+                // The interval after the latest release is closed by "now".
+                const nextAt = i + 1 < releasesForRepo.length
+                    ? releasesForRepo[i + 1].publishedAt
+                    : now;
+                const bugsInInterval = bugs.filter(bug => bug.repo === repo &&
+                    bug.createdAt > release.publishedAt &&
+                    bug.createdAt < nextAt);
+                if (bugsInInterval.length > 0) {
                     failedDeploys += 1;
+                    this.log.push({
+                        kind: 'failed-release',
+                        at: isoTimestamp(release.publishedAt),
+                        name: release.name,
+                        bugs: bugsInInterval.map(bug => ({
+                            number: bug.number,
+                            title: bug.title,
+                            createdAt: isoTimestamp(bug.createdAt)
+                        }))
+                    });
                 }
             }
         }
@@ -37894,6 +37912,7 @@ async function run({ inputs, client, core }) {
         'lead-time': leadTime,
         ...(logging && { 'lead-time-log': serializeLog(lt.getLog()) }),
         'change-failure-rate': cfr.Cfr(),
+        ...(logging && { 'change-failure-rate-log': serializeLog(cfr.getLog()) }),
         mttr: mttr.mttr()
     };
     for (const [name, value] of Object.entries(outputs)) {

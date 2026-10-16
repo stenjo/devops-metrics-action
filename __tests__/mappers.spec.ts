@@ -106,11 +106,13 @@ describe('toPullRequest', () => {
 })
 
 describe('toIssue', () => {
-  it('maps created/closed times and flattens label names', () => {
+  it('maps number, title, created/closed times and flattens label names', () => {
     const issue = toIssue(
       'o',
       'r',
       issuePayload({
+        number: 42,
+        title: 'bug: it breaks',
         created_at: '2023-04-22T21:44:06Z',
         closed_at: '2023-04-23T16:47:40Z',
         labels: [{name: 'bug'}, {name: 'p1'}] as never
@@ -119,10 +121,18 @@ describe('toIssue', () => {
 
     expect(issue).toEqual({
       repo: 'o/r',
+      number: 42,
+      title: 'bug: it breaks',
       createdAt: +new Date('2023-04-22T21:44:06Z'),
       closedAt: +new Date('2023-04-23T16:47:40Z'),
       labels: ['bug', 'p1']
     })
+  })
+
+  it('sanitizes the title', () => {
+    expect(
+      toIssue('o', 'r', issuePayload({title: 'bug: `rm`\n$(x) ${y}'})).title
+    ).toBe('bug: rm (x) {y}')
   })
 
   it('maps an open issue to closedAt null', () => {
