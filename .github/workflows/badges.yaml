@@ -27,7 +27,7 @@ jobs:
           cache: npm
 
       - name: DevOps Metrics from GitHub
-        uses: stenjo/devops-metrics-action@f1c62ea4014c6d11ae5c7bc26edf9c932918820d # v1.4.0
+        uses: stenjo/devops-metrics-action@113a5f73a92b8cd2b69047591eac8d0d9e1806b9 # v2.0.0
         id: dora
         with:
           owner: 'stenjo'
