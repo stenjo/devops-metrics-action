@@ -36,6 +36,106 @@ describe('MeanTimeToRestore should', () => {
     expect(bugCount.length).toBe(2)
     expect(bugCount[0].start).toBe(ts('2023-04-25T21:21:49Z'))
     expect(bugCount[1].end).toBe(ts('2023-04-23T16:47:40Z'))
+    expect(bugCount.map(b => b.issue.number)).toEqual([26, 16])
+  })
+
+  describe('restore log', () => {
+    it('log one restore record per contributing bug with the bounding releases', () => {
+      const m = new MeanTimeToRestore(
+        issues,
+        releases,
+        new Date('2023-04-30T16:50:53Z')
+      )
+
+      expect(m.getLog()).toEqual([])
+      const mean = m.mttr()
+
+      expect(m.getLog()).toEqual([
+        {
+          kind: 'restore',
+          number: 26,
+          title: 'fix: include also closed issues in issue list',
+          createdAt: '2023-04-25T21:21:49Z',
+          closedAt: '2023-04-29T12:54:45Z',
+          releaseBefore: 'v0.0.2',
+          releaseBeforeAt: '2023-04-22T20:28:29Z',
+          releaseAfter: 'v0.2.0',
+          releaseAfterAt: '2023-04-30T16:06:06Z',
+          restoreDays: 7.82
+        },
+        {
+          kind: 'restore',
+          number: 16,
+          title: 'Add test json data to project',
+          createdAt: '2023-04-22T21:44:06Z',
+          closedAt: '2023-04-23T16:47:40Z',
+          releaseBefore: 'v0.0.2',
+          releaseBeforeAt: '2023-04-22T20:28:29Z',
+          releaseAfter: 'v0.1.0',
+          releaseAfterAt: '2023-04-29T06:18:36Z',
+          restoreDays: 6.41
+        }
+      ])
+      expect(m.getLog().length).toBe(m.getBugCount().length)
+      // Each restoreDays is rounded, so their mean may differ from mttr() by rounding noise only.
+      const days = m.getLog().map(e => e.restoreDays)
+      const meanOfRounded = days.reduce((a, b) => a + b) / days.length
+      expect(Math.abs(meanOfRounded - mean)).toBeLessThanOrEqual(0.005)
+      expect(mean).toBe(7.11)
+    })
+
+    it('skip open bugs and bugs without a bracketing release', () => {
+      const bugs = [
+        issue({
+          number: 1,
+          repo: REPOSITORY,
+          createdAt: ts('2023-04-22T21:44:06Z'),
+          closedAt: null
+        }),
+        issue({
+          number: 2,
+          repo: REPOSITORY,
+          createdAt: ts('2023-04-19T00:00:00Z'), // before the first release
+          closedAt: ts('2023-04-23T00:00:00Z')
+        }),
+        issue({
+          number: 3,
+          repo: REPOSITORY,
+          createdAt: ts('2023-04-25T00:00:00Z'),
+          closedAt: ts('2023-04-26T00:00:00Z') // no release after
+        }),
+        issue({
+          number: 4,
+          repo: REPOSITORY,
+          createdAt: ts('2023-04-21T00:00:00Z'),
+          closedAt: ts('2023-04-23T00:00:00Z')
+        })
+      ]
+      const localReleases = [
+        release('2023-04-20T00:00:00Z', REPOSITORY, 'early'),
+        release('2023-04-24T00:00:00Z', REPOSITORY, 'late')
+      ]
+      const m = new MeanTimeToRestore(
+        bugs,
+        localReleases,
+        new Date('2023-04-30T00:00:00Z')
+      )
+
+      expect(m.mttr()).toBe(4)
+      expect(m.getLog().map(e => e.number)).toEqual([4])
+      expect(m.getLog()[0]).toMatchObject({
+        releaseBefore: 'early',
+        releaseAfter: 'late',
+        restoreDays: 4
+      })
+    })
+
+    it('leave the log empty when no bug contributes', () => {
+      const m = new MeanTimeToRestore([], releases)
+
+      expect(m.mttr()).toBe(0)
+      expect(m.getLog()).toEqual([])
+    })
   })
 
   it('find release time before date', () => {
@@ -88,7 +188,8 @@ describe('MeanTimeToRestore should', () => {
     const bug: BugTime = {
       start: ts('2023-04-22T21:44:06Z'),
       end: ts('2023-04-23T16:47:40Z'),
-      repo: DMA
+      repo: DMA,
+      issue: issue()
     }
     const releaseDiff = ts('2023-04-29T06:18:36Z') - ts('2023-04-22T20:28:29Z')
 
@@ -100,7 +201,8 @@ describe('MeanTimeToRestore should', () => {
     const bug: BugTime = {
       start: ts('2023-04-25T21:21:49Z'),
       end: ts('2023-04-29T12:54:45Z'),
-      repo: DMA
+      repo: DMA,
+      issue: issue()
     }
     const releaseDiff = ts('2023-04-30T16:06:06Z') - ts('2023-04-22T20:28:29Z')
 

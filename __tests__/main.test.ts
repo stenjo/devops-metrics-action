@@ -545,6 +545,20 @@ describe('run', () => {
       }
     ])
     ;(MeanTimeToRestore.prototype.mttr as Mock).mockReturnValue(3)
+    ;(MeanTimeToRestore.prototype.getLog as Mock).mockReturnValue([
+      {
+        kind: 'restore',
+        number: 3,
+        title: 'bug: x',
+        createdAt: '2023-04-13T00:00:00Z',
+        closedAt: '2023-04-14T00:00:00Z',
+        releaseBefore: 'v0.0.1',
+        releaseBeforeAt: '2023-04-12T22:33:24Z',
+        releaseAfter: 'v0.0.2',
+        releaseAfterAt: '2023-04-22T20:28:29Z',
+        restoreDays: 9.91
+      }
+    ])
   })
 
   it('wires the injected client, owner and repositories into every adapter', async () => {
@@ -604,7 +618,13 @@ describe('run', () => {
       'change-failure-rate-log':
         '[{"kind":"failed-release","at":"2023-04-12T22:33:24Z","name":"v0.0.1",' +
         '"bugs":[{"number":3,"title":"bug: x","createdAt":"2023-04-13T00:00:00Z"}]}]',
-      mttr: 3
+      mttr: 3,
+      'mttr-log':
+        '[{"kind":"restore","number":3,"title":"bug: x",' +
+        '"createdAt":"2023-04-13T00:00:00Z","closedAt":"2023-04-14T00:00:00Z",' +
+        '"releaseBefore":"v0.0.1","releaseBeforeAt":"2023-04-12T22:33:24Z",' +
+        '"releaseAfter":"v0.0.2","releaseAfterAt":"2023-04-22T20:28:29Z",' +
+        '"restoreDays":9.91}]'
     }
     expect(outputs).toEqual(expected)
     expect(fake.setOutput.mock.calls).toEqual(Object.entries(expected))
@@ -613,6 +633,7 @@ describe('run', () => {
     expect(
       JSON.parse(outputs['change-failure-rate-log'] as string)
     ).toHaveLength(1)
+    expect(JSON.parse(outputs['mttr-log'] as string)).toHaveLength(1)
   })
 
   it('does not set log outputs when logging is disabled', async () => {

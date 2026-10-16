@@ -37575,12 +37575,14 @@ class IssuesAdapter {
 }
 
 ;// CONCATENATED MODULE: ./src/MeanTimeToRestore.ts
+
 const MeanTimeToRestore_ONE_DAY = 1000 * 60 * 60 * 24;
 class MeanTimeToRestore {
     today;
     issues;
     releases; // Sorted ascending by publishedAt
     bugLabel;
+    log = [];
     constructor(issues, releases, today = null, bugLabel = 'bug') {
         if (today === null) {
             this.today = new Date();
@@ -37609,7 +37611,8 @@ class MeanTimeToRestore {
                 values.push({
                     start: bug.createdAt,
                     end: bug.closedAt,
-                    repo: bug.repo
+                    repo: bug.repo,
+                    issue: bug
                 });
             }
         }
@@ -37645,23 +37648,43 @@ class MeanTimeToRestore {
     hasLaterRelease(date, repo) {
         return this.releases.some(r => r.publishedAt > date && r.repo === repo);
     }
+    getRestoreWindow(bug) {
+        return {
+            before: this.getReleaseBefore(bug.start, bug.repo),
+            after: this.getReleaseAfter(bug.end, bug.repo)
+        };
+    }
     getRestoreTime(bug) {
-        const prevRel = this.getReleaseBefore(bug.start, bug.repo);
-        const nextRel = this.getReleaseAfter(bug.end, bug.repo);
-        return nextRel.publishedAt - prevRel.publishedAt;
+        const { before, after } = this.getRestoreWindow(bug);
+        return after.publishedAt - before.publishedAt;
+    }
+    getLog() {
+        return this.log;
     }
     mttr() {
-        const ttr = this.getBugCount().map(bug => {
-            return this.getRestoreTime(bug);
-        }, this);
-        if (ttr.length === 0) {
+        const bugs = this.getBugCount();
+        if (bugs.length === 0) {
             return 0;
         }
         let sum = 0;
-        for (const ttrElement of ttr) {
-            sum += ttrElement;
+        for (const bug of bugs) {
+            const { before, after } = this.getRestoreWindow(bug);
+            const restoreTime = after.publishedAt - before.publishedAt;
+            sum += restoreTime;
+            this.log.push({
+                kind: 'restore',
+                number: bug.issue.number,
+                title: bug.issue.title,
+                createdAt: isoTimestamp(bug.start),
+                closedAt: isoTimestamp(bug.end),
+                releaseBefore: before.name,
+                releaseBeforeAt: isoTimestamp(before.publishedAt),
+                releaseAfter: after.name,
+                releaseAfterAt: isoTimestamp(after.publishedAt),
+                restoreDays: Math.round((restoreTime / MeanTimeToRestore_ONE_DAY) * 100) / 100
+            });
         }
-        return Math.round((sum / ttr.length / MeanTimeToRestore_ONE_DAY) * 100) / 100; // Two decimals
+        return Math.round((sum / bugs.length / MeanTimeToRestore_ONE_DAY) * 100) / 100; // Two decimals
     }
 }
 
@@ -37913,7 +37936,8 @@ async function run({ inputs, client, core }) {
         ...(logging && { 'lead-time-log': serializeLog(lt.getLog()) }),
         'change-failure-rate': cfr.Cfr(),
         ...(logging && { 'change-failure-rate-log': serializeLog(cfr.getLog()) }),
-        mttr: mttr.mttr()
+        mttr: mttr.mttr(),
+        ...(logging && { 'mttr-log': serializeLog(mttr.getLog()) })
     };
     for (const [name, value] of Object.entries(outputs)) {
         core.setOutput(name, value);

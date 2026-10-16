@@ -27,6 +27,7 @@ export interface Outputs {
   'change-failure-rate': number
   'change-failure-rate-log'?: string
   mttr: number
+  'mttr-log'?: string
 }
 
 export type ActionsCore = Pick<
@@ -200,7 +201,8 @@ export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
     ...(logging && {'lead-time-log': serializeLog(lt.getLog())}),
     'change-failure-rate': cfr.Cfr(),
     ...(logging && {'change-failure-rate-log': serializeLog(cfr.getLog())}),
-    mttr: mttr.mttr()
+    mttr: mttr.mttr(),
+    ...(logging && {'mttr-log': serializeLog(mttr.getLog())})
   }
   for (const [name, value] of Object.entries(outputs)) {
     core.setOutput(name, value)

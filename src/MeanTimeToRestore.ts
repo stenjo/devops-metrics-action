@@ -1,11 +1,14 @@
 import type {Issue} from './types/Issue'
 import type {Release} from './types/Release'
 import type {RepoKey} from './types/RepoKey'
+import type {RestoreLogEntry} from './types/LogEntry'
+import {isoTimestamp} from './types/Timestamp'
 
 export interface BugTime {
   start: number
   end: number
   repo: RepoKey
+  issue: Issue
 }
 
 const ONE_DAY = 1000 * 60 * 60 * 24
@@ -15,6 +18,7 @@ export class MeanTimeToRestore {
   issues: Issue[]
   releases: Release[] // Sorted ascending by publishedAt
   bugLabel: string
+  log: RestoreLogEntry[] = []
 
   constructor(
     issues: Issue[],
@@ -53,7 +57,8 @@ export class MeanTimeToRestore {
         values.push({
           start: bug.createdAt,
           end: bug.closedAt,
-          repo: bug.repo
+          repo: bug.repo,
+          issue: bug
         })
       }
     }
@@ -105,27 +110,48 @@ export class MeanTimeToRestore {
     return this.releases.some(r => r.publishedAt > date && r.repo === repo)
   }
 
-  getRestoreTime(bug: BugTime): number {
-    const prevRel = this.getReleaseBefore(bug.start, bug.repo)
-    const nextRel = this.getReleaseAfter(bug.end, bug.repo)
+  private getRestoreWindow(bug: BugTime): {before: Release; after: Release} {
+    return {
+      before: this.getReleaseBefore(bug.start, bug.repo),
+      after: this.getReleaseAfter(bug.end, bug.repo)
+    }
+  }
 
-    return nextRel.publishedAt - prevRel.publishedAt
+  getRestoreTime(bug: BugTime): number {
+    const {before, after} = this.getRestoreWindow(bug)
+
+    return after.publishedAt - before.publishedAt
+  }
+
+  getLog(): RestoreLogEntry[] {
+    return this.log
   }
 
   mttr(): number {
-    const ttr: number[] = this.getBugCount().map(bug => {
-      return this.getRestoreTime(bug)
-    }, this)
-
-    if (ttr.length === 0) {
+    const bugs = this.getBugCount()
+    if (bugs.length === 0) {
       return 0
     }
 
     let sum = 0
-    for (const ttrElement of ttr) {
-      sum += ttrElement
+    for (const bug of bugs) {
+      const {before, after} = this.getRestoreWindow(bug)
+      const restoreTime = after.publishedAt - before.publishedAt
+      sum += restoreTime
+      this.log.push({
+        kind: 'restore',
+        number: bug.issue.number,
+        title: bug.issue.title,
+        createdAt: isoTimestamp(bug.start),
+        closedAt: isoTimestamp(bug.end),
+        releaseBefore: before.name,
+        releaseBeforeAt: isoTimestamp(before.publishedAt),
+        releaseAfter: after.name,
+        releaseAfterAt: isoTimestamp(after.publishedAt),
+        restoreDays: Math.round((restoreTime / ONE_DAY) * 100) / 100
+      })
     }
 
-    return Math.round((sum / ttr.length / ONE_DAY) * 100) / 100 // Two decimals
+    return Math.round((sum / bugs.length / ONE_DAY) * 100) / 100 // Two decimals
   }
 }
