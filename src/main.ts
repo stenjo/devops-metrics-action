@@ -9,6 +9,7 @@ import {PullRequestsAdapter} from './PullRequestsAdapter'
 import {CommitsAdapter} from './CommitsAdapter'
 import {LeadTime} from './LeadTime'
 import {serializeLog} from './log'
+import {metricsWindow} from './MetricsWindow'
 
 export interface Inputs {
   owner: string
@@ -182,35 +183,37 @@ export function parseInputs(
 
 export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
   const {owner, repositories, logging, filtered, bugLabel} = inputs
+  // The only clock read in src/: every adapter and metric shares this window.
+  const window = metricsWindow(new Date())
 
   // Fetch everything first so an API failure aborts before any output is set.
   const releaseList = await new ReleaseAdapter(
     client,
     owner,
-    repositories
+    repositories,
+    window
   ).GetAllReleasesLastMonth()
   const pulls = await new PullRequestsAdapter(
     client,
     owner,
-    repositories
+    repositories,
+    window
   ).GetAllPRsLastMonth()
   const issueList = await new IssuesAdapter(
     client,
     owner,
-    repositories
+    repositories,
+    window
   ).GetAllIssuesLastMonth()
 
-  const df = new DeployFrequency(releaseList)
-  const lt = new LeadTime(
-    pulls,
-    releaseList,
-    new CommitsAdapter(client),
-    null,
-    core
-  )
+  const df = new DeployFrequency(releaseList, {window})
+  const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client), {
+    window,
+    logger: core
+  })
   const leadTime = await lt.getLeadTime(filtered)
-  const cfr = new ChangeFailureRate(issueList, releaseList, null, bugLabel)
-  const mttr = new MeanTimeToRestore(issueList, releaseList, null, bugLabel)
+  const cfr = new ChangeFailureRate(issueList, releaseList, {window, bugLabel})
+  const mttr = new MeanTimeToRestore(issueList, releaseList, {window, bugLabel})
 
   const outputs: Outputs = {
     'deploy-rate': df.rate(),

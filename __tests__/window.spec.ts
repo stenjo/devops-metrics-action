@@ -1,12 +1,4 @@
-import {fetchWindowStart, isBeforeWindow} from '../src/github/window'
-
-describe('fetchWindowStart', () => {
-  it('is exactly 61 days before today', () => {
-    expect(fetchWindowStart(new Date('2024-03-01T12:00:00Z'))).toBe(
-      +new Date('2023-12-31T12:00:00Z')
-    )
-  })
-})
+import {isBeforeWindow} from '../src/github/window'
 
 describe('isBeforeWindow', () => {
   const windowStart = +new Date('2023-12-31T12:00:00Z')

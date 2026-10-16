@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import {windowAt} from './helpers/domain'
 import {IssuesAdapter} from '../src/IssuesAdapter'
 import {GitHubClient} from '../src/GitHubClient'
 import type {GitHubIssuePayload} from '../src/github/payloads'
@@ -10,7 +11,8 @@ describe.skipIf(!process.env.GH_TOKEN)('Real Issues API should', () => {
   const issueAdapter = new IssuesAdapter(
     new GitHubClient({token: process.env.GH_TOKEN}),
     'stenjo',
-    ['dora']
+    ['dora'],
+    windowAt()
   )
 
   test('fetch issues', async () => {
@@ -21,9 +23,12 @@ describe.skipIf(!process.env.GH_TOKEN)('Real Issues API should', () => {
 
 describe('mocked Issues API should', () => {
   test('return issues mapped to the domain type', async () => {
-    const issueAdapter = new IssuesAdapter(new GitHubClient(), 'stenjo', [
-      'devops-metrics-action'
-    ])
+    const issueAdapter = new IssuesAdapter(
+      new GitHubClient(),
+      'stenjo',
+      ['devops-metrics-action'],
+      windowAt()
+    )
     mockedGetIssuesReturns('./__tests__/test-data/issue-list.json')
 
     const il = await issueAdapter.GetAllIssuesLastMonth()

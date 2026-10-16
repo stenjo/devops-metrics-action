@@ -3,6 +3,8 @@ import type {Release} from './types/Release'
 import type {RepoKey} from './types/RepoKey'
 import type {RestoreLogEntry} from './types/LogEntry'
 import {isoTimestamp} from './types/Timestamp'
+import {inWindow} from './MetricsWindow'
+import type {MetricOptions, MetricsWindow} from './MetricsWindow'
 
 export interface BugTime {
   start: number
@@ -14,25 +16,16 @@ export interface BugTime {
 const ONE_DAY = 1000 * 60 * 60 * 24
 
 export class MeanTimeToRestore {
-  today: Date
   issues: Issue[]
   releases: Release[] // Sorted ascending by publishedAt
   bugLabel: string
   log: RestoreLogEntry[] = []
+  private readonly window: MetricsWindow
 
-  constructor(
-    issues: Issue[],
-    releases: Release[],
-    today: Date | null = null,
-    bugLabel = 'bug'
-  ) {
-    if (today === null) {
-      this.today = new Date()
-    } else {
-      this.today = today
-    }
+  constructor(issues: Issue[], releases: Release[], options: MetricOptions) {
+    this.window = options.window
     this.issues = issues
-    this.bugLabel = bugLabel
+    this.bugLabel = options.bugLabel ?? 'bug'
     if (releases === null || releases.length === 0) {
       throw new Error('Empty release list')
     }
@@ -70,7 +63,7 @@ export class MeanTimeToRestore {
     for (const issue of this.issues) {
       if (
         issue.labels.includes(this.bugLabel) &&
-        issue.createdAt > this.today.getTime() - 30 * ONE_DAY
+        inWindow(this.window, issue.createdAt)
       ) {
         bugs.push(issue)
       }

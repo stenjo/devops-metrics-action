@@ -4,8 +4,15 @@ import type {PullRequest} from '../../src/types/PullRequest'
 import type {Issue} from '../../src/types/Issue'
 import type {Commit} from '../../src/types/Commit'
 import type {RepoKey} from '../../src/types/RepoKey'
+import type {MetricsWindow} from '../../src/MetricsWindow'
+import {metricsWindow} from '../../src/MetricsWindow'
 
 export const ts = (iso: string): number => +new Date(iso)
+
+// The 30-day metric window ending at `now` (ISO string or Date).
+export function windowAt(now: string | Date = new Date()): MetricsWindow {
+  return metricsWindow(typeof now === 'string' ? new Date(now) : now)
+}
 
 export function release(
   publishedAt: string,

@@ -4,6 +4,8 @@ import type {PullLogEntry} from './types/LogEntry'
 import type {Logger} from './types/Logger'
 import type {ICommitsAdapter} from './interfaces/ICommitsAdapter'
 import {isoTimestamp} from './types/Timestamp'
+import {inWindow} from './MetricsWindow'
+import type {MetricOptions} from './MetricsWindow'
 
 type MergedPullRequest = PullRequest & {mergedAt: number}
 
@@ -22,6 +24,11 @@ export interface LeadTimeLimits {
 // A function rather than constants so the values are not static mutants for Stryker.
 export function defaultLeadTimeLimits(): LeadTimeLimits {
   return {maxCommitFetches: 200, concurrency: 4}
+}
+
+export interface LeadTimeOptions extends MetricOptions {
+  logger?: Pick<Logger, 'warning'>
+  limits?: LeadTimeLimits
 }
 
 // Runs `fn` over `items` with at most `limit` calls in flight; results keep item order.
@@ -47,7 +54,6 @@ export class LeadTime {
   log: PullLogEntry[] = []
   pulls: MergedPullRequest[]
   releases: Release[]
-  today: Date
   commitsAdapter: ICommitsAdapter
   private readonly logger: Pick<Logger, 'warning'>
   private readonly limits: LeadTimeLimits
@@ -56,24 +62,17 @@ export class LeadTime {
     pulls: PullRequest[],
     releases: Release[],
     commitsAdapter: ICommitsAdapter,
-    today: Date | null = null,
-    logger: Pick<Logger, 'warning'> = {warning: () => undefined},
-    limits: LeadTimeLimits = defaultLeadTimeLimits()
+    options: LeadTimeOptions
   ) {
-    if (today === null) {
-      this.today = new Date()
-    } else {
-      this.today = today
-    }
-
-    const since = this.today.valueOf() - 31 * ONE_DAY
+    const {window} = options
     this.pulls = pulls.filter(
-      (p): p is MergedPullRequest => p.mergedAt !== null && p.mergedAt > since
+      (p): p is MergedPullRequest =>
+        p.mergedAt !== null && inWindow(window, p.mergedAt)
     )
     this.releases = releases
     this.commitsAdapter = commitsAdapter
-    this.logger = logger
-    this.limits = limits
+    this.logger = options.logger ?? {warning: () => undefined}
+    this.limits = options.limits ?? defaultLeadTimeLimits()
   }
 
   getLog(): PullLogEntry[] {

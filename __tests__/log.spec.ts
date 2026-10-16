@@ -5,7 +5,7 @@ import {DeployFrequency} from '../src/DeployFrequency'
 import {toCommit, toPullRequest, toRelease} from '../src/github/mappers'
 import type {ICommitsAdapter} from '../src/interfaces/ICommitsAdapter'
 import type {Commit} from '../src/types/Commit'
-import {pull, release} from './helpers/domain'
+import {pull, release, windowAt} from './helpers/domain'
 import {
   commitPayload,
   pullRequestPayload,
@@ -150,7 +150,7 @@ describe('log outputs end to end', () => {
       toPullRequest('o', 'r', pullRequestPayload({title: INJECTION}))
     ]
     const releases = [toRelease('o', 'r', releasePayload({name: INJECTION}))]
-    const lt = new LeadTime(pulls, releases, commits, today)
+    const lt = new LeadTime(pulls, releases, commits, {window: windowAt(today)})
     await lt.getLeadTime()
 
     const out = serializeLog(lt.getLog())
@@ -173,7 +173,9 @@ describe('log outputs end to end', () => {
         releasePayload({name: INJECTION, published_at: '2023-04-30T17:50:53Z'})
       )
     ]
-    const df = new DeployFrequency(releases, '2023-05-01T00:00:00Z')
+    const df = new DeployFrequency(releases, {
+      window: windowAt('2023-05-01T00:00:00Z')
+    })
     df.rate()
 
     const out = serializeLog(df.getLog())
@@ -194,14 +196,10 @@ describe('log outputs end to end', () => {
     const pulls = Array.from({length: 1000}, (_, i) =>
       pull({title: `feat: change ${i.toString()}`})
     )
-    const lt = new LeadTime(
-      pulls,
-      [release('2023-04-30T17:50:53Z')],
-      commits,
-      today,
-      undefined,
-      {maxCommitFetches: 1000, concurrency: 4}
-    )
+    const lt = new LeadTime(pulls, [release('2023-04-30T17:50:53Z')], commits, {
+      window: windowAt(today),
+      limits: {maxCommitFetches: 1000, concurrency: 4}
+    })
     await lt.getLeadTime()
 
     const out = serializeLog(lt.getLog())

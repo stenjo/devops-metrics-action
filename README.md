@@ -98,10 +98,26 @@ bug-label: incident
 
 ## Outputs
 
+All four metrics share one time window: the **30 days ending at the moment the
+action runs** (`from = now - 30 days`, `to = now`). An event counts when
+`from <= t < to`, so an event exactly 30 days old is included and one that is
+30 days and 1 ms old is not. The event each metric filters on is:
+
+| Metric                | Window applied to                        |
+| --------------------- | ---------------------------------------- |
+| `deploy-frequency`    | release `published_at`                   |
+| `lead-time`           | pull request `merged_at`                 |
+| `change-failure-rate` | release `published_at` (the denominator) |
+| `mttr`                | bug issue `created_at`                   |
+
+The action fetches a further 30 days of history before `from` so that `mttr`
+and `change-failure-rate` can find the release that preceded a bug opened early
+in the window.
+
 ### `deploy-frequency`
 
-Rate of deploys (tagged releases) per week. Decimal number. Elite performing
-teams has 7 as target (daily- or on-demand release)
+Rate of deploys (tagged releases) per week over the 30-day window. Decimal
+number. Elite performing teams has 7 as target (daily- or on-demand release)
 
 `deploy-rate-log` - a JSON array of the releases forming the basis for the
 metric, if `logging` is enabled. See [Log outputs](#log-outputs).
@@ -118,8 +134,8 @@ and release forming the basis for the metric, if `logging` is enabled. See
 ### `change-failure-rate`
 
 Number of registered issues tagged as bugs divided by number of release tags
-last month. By counting the bugs (GitHub issues tagged with the `bug-label`
-label, default `bug`) between releases the last month and average this, we get
+in the window. By counting the bugs (GitHub issues tagged with the `bug-label`
+label, default `bug`) between releases in the window and average this, we get
 the failures over releases rate. Number in range 0 - 100 (%)
 
 `change-failure-rate-log` - a JSON array of the releases counted as failed,

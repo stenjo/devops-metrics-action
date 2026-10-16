@@ -8,9 +8,8 @@ import type {
 import {toIssue, toRelease} from '../src/github/mappers'
 import fs from 'node:fs'
 import {ChangeFailureRate} from '../src/ChangeFailureRate'
-import {issue, release, ts} from './helpers/domain'
+import {issue, release, ts, windowAt} from './helpers/domain'
 
-const ONE_DAY = 24 * 60 * 60 * 1000
 const DORA = 'stenjo/dora'
 const REPOSITORY = 'somepath/repository'
 const OTHER = 'somepath/other-repo'
@@ -33,11 +32,9 @@ const bug = (createdAt: string, repo: RepoKey = REPOSITORY): Issue =>
 
 describe('ChangeFailureRate should', () => {
   it('get number of bugs created', () => {
-    const cfr = new ChangeFailureRate(
-      fixtureIssues(),
-      fixtureReleases(),
-      new Date('2023-04-23T16:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(fixtureIssues(), fixtureReleases(), {
+      window: windowAt('2023-05-01T00:00:00Z')
+    })
 
     const bugs = cfr.getBugs()
 
@@ -45,11 +42,9 @@ describe('ChangeFailureRate should', () => {
   })
 
   it('get percentage rate', () => {
-    const cfr = new ChangeFailureRate(
-      fixtureIssues(),
-      fixtureReleases(),
-      new Date('2023-04-23T16:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(fixtureIssues(), fixtureReleases(), {
+      window: windowAt('2023-05-01T00:00:00Z')
+    })
 
     const cfrPercentage = cfr.Cfr()
 
@@ -57,11 +52,9 @@ describe('ChangeFailureRate should', () => {
   })
 
   it('calculate 0 failures on 0 releases', () => {
-    const cfr = new ChangeFailureRate(
-      fixtureIssues(),
-      [],
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(fixtureIssues(), [], {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -69,11 +62,9 @@ describe('ChangeFailureRate should', () => {
   })
 
   it('calculate 0 failures on 0 issues', () => {
-    const cfr = new ChangeFailureRate(
-      [],
-      fixtureReleases(),
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate([], fixtureReleases(), {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -84,11 +75,9 @@ describe('ChangeFailureRate should', () => {
     const bugs = [bug('2023-04-30T17:50:53Z', DORA)]
     const releases = [release('2023-04-30T16:50:53Z', DORA)]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -103,20 +92,20 @@ describe('ChangeFailureRate should', () => {
     const doraRelease = (publishedAt: string, repo: RepoKey = DORA): Release =>
       release(publishedAt, repo)
 
-    it('exclude releases published exactly 31 days ago', () => {
+    it('include a release published exactly 30 days ago and exclude one 1 ms earlier', () => {
       const onBoundary = new ChangeFailureRate(
         [doraBug('2023-04-15T00:00:00Z')],
-        [doraRelease('2023-03-31T00:00:00Z')],
-        today
+        [doraRelease('2023-04-01T00:00:00Z')],
+        {window: windowAt(today)}
       )
-      const inside = new ChangeFailureRate(
+      const before = new ChangeFailureRate(
         [doraBug('2023-04-15T00:00:00Z')],
-        [doraRelease('2023-03-31T00:00:01Z')],
-        today
+        [doraRelease('2023-03-31T23:59:59.999Z')],
+        {window: windowAt(today)}
       )
 
-      expect(onBoundary.Cfr()).toBe(0)
-      expect(inside.Cfr()).toBe(100)
+      expect(onBoundary.Cfr()).toBe(100)
+      expect(before.Cfr()).toBe(0)
     })
 
     it('not count a bug created at the exact release time', () => {
@@ -127,12 +116,12 @@ describe('ChangeFailureRate should', () => {
       const atFirst = new ChangeFailureRate(
         [doraBug('2023-04-10T00:00:00Z')],
         [...releases],
-        today
+        {window: windowAt(today)}
       )
       const atSecond = new ChangeFailureRate(
         [doraBug('2023-04-20T00:00:00Z')],
         [...releases],
-        today
+        {window: windowAt(today)}
       )
 
       expect(atFirst.Cfr()).toBe(0)
@@ -148,7 +137,7 @@ describe('ChangeFailureRate should', () => {
       const cfr = new ChangeFailureRate(
         [doraBug('2023-04-15T00:00:00Z'), doraBug('2023-04-25T00:00:00Z')],
         releases,
-        today
+        {window: windowAt(today)}
       )
 
       expect(cfr.Cfr()).toBe(67)
@@ -167,7 +156,7 @@ describe('ChangeFailureRate should', () => {
           doraBug('2023-04-15T00:00:00Z', other)
         ],
         releases,
-        today
+        {window: windowAt(today)}
       )
 
       expect(cfr.Cfr()).toBe(67)
@@ -188,18 +177,18 @@ describe('ChangeFailureRate should', () => {
           doraBug('2023-04-15T00:00:00Z', 'o/api')
         ],
         releases,
-        today
+        {window: windowAt(today)}
       )
 
       expect(cfr.Cfr()).toBe(33)
       expect(cfr.repos).toEqual(['o/api'])
     })
 
-    it('ignore bugs created in the future without failing', () => {
-      const now = Date.now()
+    it('ignore bugs created after the window end without failing', () => {
       const cfr = new ChangeFailureRate(
-        [doraBug(new Date(now + ONE_DAY).toISOString())],
-        [doraRelease(new Date(now - ONE_DAY).toISOString())]
+        [doraBug('2023-05-02T00:00:00Z')],
+        [doraRelease('2023-04-30T00:00:00Z')],
+        {window: windowAt(today)}
       )
 
       expect(cfr.Cfr()).toBe(0)
@@ -213,7 +202,7 @@ describe('ChangeFailureRate should', () => {
       const cfr = new ChangeFailureRate(
         [bug('2023-04-05T00:00:00Z', DORA)],
         [release('2023-04-10T00:00:00Z', DORA, 'v1')],
-        today
+        {window: windowAt(today)}
       )
 
       expect(cfr.getLog()).toEqual([])
@@ -250,7 +239,9 @@ describe('ChangeFailureRate should', () => {
           closedAt: null
         })
       ]
-      const cfr = new ChangeFailureRate(bugs, releases, today)
+      const cfr = new ChangeFailureRate(bugs, releases, {
+        window: windowAt(today)
+      })
 
       expect(cfr.Cfr()).toBe(67)
       expect(cfr.getLog()).toEqual([
@@ -280,7 +271,7 @@ describe('ChangeFailureRate should', () => {
       const cfr = new ChangeFailureRate(
         [bug('2023-04-30T17:50:53Z', DORA)],
         [release('2023-04-30T16:50:53Z', DORA, 'v9')],
-        today
+        {window: windowAt(today)}
       )
 
       expect(cfr.Cfr()).toBe(100)
@@ -301,7 +292,7 @@ describe('ChangeFailureRate should', () => {
       const cfr = new ChangeFailureRate(
         [bug('2023-04-25T00:00:00Z', DORA), bug('2023-04-15T00:00:00Z', other)],
         releases,
-        today
+        {window: windowAt(today)}
       )
 
       expect(cfr.Cfr()).toBe(67)
@@ -312,11 +303,9 @@ describe('ChangeFailureRate should', () => {
     })
 
     it('match the fixture rate: failed intervals over releases in window', () => {
-      const cfr = new ChangeFailureRate(
-        fixtureIssues(),
-        fixtureReleases(),
-        new Date('2023-04-23T16:50:53Z')
-      )
+      const cfr = new ChangeFailureRate(fixtureIssues(), fixtureReleases(), {
+        window: windowAt('2023-05-01T00:00:00Z')
+      })
 
       expect(cfr.Cfr()).toBe(14)
       expect(cfr.getLog()).toHaveLength(1)
@@ -332,7 +321,9 @@ describe('ChangeFailureRate should', () => {
     const bugs = [bug('2023-04-30T17:50:53Z', DORA)]
     const releases = [release('2023-04-30T16:50:53Z', DORA)]
 
-    const cfr = new ChangeFailureRate(bugs, releases)
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-06-15T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -343,11 +334,9 @@ describe('ChangeFailureRate should', () => {
     const bugs = [bug('2023-04-30T17:50:53Z', DORA)]
     const releases = [release('2023-04-30T16:50:53Z', 'stenjo/other-repo')]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -361,11 +350,9 @@ describe('ChangeFailureRate should', () => {
       release('2023-04-29T16:50:53Z', REPOSITORY)
     ]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -379,11 +366,9 @@ describe('ChangeFailureRate should', () => {
       release('2023-04-29T16:50:53Z', REPOSITORY)
     ]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -397,11 +382,9 @@ describe('ChangeFailureRate should', () => {
       release('2023-04-29T16:50:53Z', REPOSITORY)
     ]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -415,11 +398,9 @@ describe('ChangeFailureRate should', () => {
       release('2023-04-29T16:50:53Z', REPOSITORY)
     ]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-05-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-29T17:50:53Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -437,11 +418,9 @@ describe('ChangeFailureRate should', () => {
       release('2023-04-29T16:50:53Z', REPOSITORY)
     ]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -460,11 +439,9 @@ describe('ChangeFailureRate should', () => {
       release('2023-05-02T16:50:53Z', REPOSITORY)
     ]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -484,11 +461,9 @@ describe('ChangeFailureRate should', () => {
       release('2023-05-02T16:50:53Z', REPOSITORY)
     ]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-04-30T17:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-03T00:00:00Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -507,11 +482,9 @@ describe('ChangeFailureRate should', () => {
       release('2023-04-02T16:50:53Z', REPOSITORY)
     ]
 
-    const cfr = new ChangeFailureRate(
-      bugs,
-      releases,
-      new Date('2023-05-29T10:50:53Z')
-    )
+    const cfr = new ChangeFailureRate(bugs, releases, {
+      window: windowAt('2023-05-28T10:50:53Z')
+    })
 
     const value = cfr.Cfr()
 
@@ -520,31 +493,27 @@ describe('ChangeFailureRate should', () => {
 
   describe('with a custom bug label', () => {
     const releases = [release('2023-04-30T16:50:53Z', DORA)]
-    const today = new Date('2023-04-30T17:50:53Z')
+    const today = new Date('2023-05-03T00:00:00Z')
 
     const issuesLabelled = (label: string): Issue[] => [
       {...bug('2023-04-30T17:50:53Z', DORA), labels: [label]}
     ]
 
     it('count issues tagged with the custom label', () => {
-      const cfr = new ChangeFailureRate(
-        issuesLabelled('incident'),
-        releases,
-        today,
-        'incident'
-      )
+      const cfr = new ChangeFailureRate(issuesLabelled('incident'), releases, {
+        window: windowAt(today),
+        bugLabel: 'incident'
+      })
 
       expect(cfr.getBugs().length).toBe(1)
       expect(cfr.Cfr()).toBe(100)
     })
 
     it('ignore issues tagged bug when a custom label is given', () => {
-      const cfr = new ChangeFailureRate(
-        issuesLabelled('bug'),
-        releases,
-        today,
-        'incident'
-      )
+      const cfr = new ChangeFailureRate(issuesLabelled('bug'), releases, {
+        window: windowAt(today),
+        bugLabel: 'incident'
+      })
 
       expect(cfr.getBugs().length).toBe(0)
       expect(cfr.Cfr()).toBe(0)
@@ -554,12 +523,12 @@ describe('ChangeFailureRate should', () => {
       const cfrDefault = new ChangeFailureRate(
         issuesLabelled('bug'),
         releases,
-        today
+        {window: windowAt(today)}
       )
       const cfrIncident = new ChangeFailureRate(
         issuesLabelled('incident'),
         releases,
-        today
+        {window: windowAt(today)}
       )
 
       expect(cfrDefault.getBugs().length).toBe(1)

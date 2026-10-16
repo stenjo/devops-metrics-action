@@ -3,29 +3,24 @@ import type {Release} from './types/Release'
 import type {RepoKey} from './types/RepoKey'
 import type {FailedReleaseLogEntry} from './types/LogEntry'
 import {isoTimestamp} from './types/Timestamp'
+import {inWindow} from './MetricsWindow'
+import type {MetricOptions, MetricsWindow} from './MetricsWindow'
 
 export class ChangeFailureRate {
-  today: Date
   issues: Issue[]
   releases: Release[]
   repos: RepoKey[]
   bugLabel: string
   log: FailedReleaseLogEntry[] = []
+  private readonly window: MetricsWindow
 
-  constructor(
-    issues: Issue[],
-    releases: Release[],
-    today: Date | null = null,
-    bugLabel = 'bug'
-  ) {
-    this.today = today === null ? new Date() : today
+  constructor(issues: Issue[], releases: Release[], options: MetricOptions) {
+    this.window = options.window
     this.issues = issues
-    this.bugLabel = bugLabel
+    this.bugLabel = options.bugLabel ?? 'bug'
     this.releases = releases
       .sort((a, b) => (a.publishedAt < b.publishedAt ? -1 : 1))
-      .filter(
-        r => r.publishedAt > this.today.valueOf() - 31 * 24 * 60 * 60 * 1000
-      )
+      .filter(r => inWindow(this.window, r.publishedAt))
     this.repos = []
   }
 
@@ -55,7 +50,7 @@ export class ChangeFailureRate {
         this.repos.push(bug.repo)
       }
     }
-    const now = Date.now()
+    const now = this.window.to
 
     let failedDeploys = 0
     for (const repo of this.repos) {

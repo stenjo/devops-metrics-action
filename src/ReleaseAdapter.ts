@@ -3,23 +3,29 @@ import type {IReleaseAdapter} from './interfaces/IReleaseAdapter'
 import type {GitHubClient} from './GitHubClient'
 import type {GitHubReleasePayload} from './github/payloads'
 import {toRelease} from './github/mappers'
-import {fetchWindowStart, isBeforeWindow} from './github/window'
+import {isBeforeWindow} from './github/window'
+import type {MetricsWindow} from './MetricsWindow'
 
 export class ReleaseAdapter implements IReleaseAdapter {
   client: GitHubClient
   owner: string
   repositories: string[]
-  today: Date
+  private readonly window: Pick<MetricsWindow, 'fetchFrom'>
 
-  constructor(client: GitHubClient, owner: string, repositories: string[]) {
+  constructor(
+    client: GitHubClient,
+    owner: string,
+    repositories: string[],
+    window: Pick<MetricsWindow, 'fetchFrom'>
+  ) {
     this.client = client
     this.owner = owner
     this.repositories = repositories
-    this.today = new Date()
+    this.window = window
   }
 
   async GetAllReleasesLastMonth(): Promise<Release[]> {
-    const windowStart = fetchWindowStart(this.today)
+    const {fetchFrom} = this.window
     let result: Release[] = []
     for (const repo of this.repositories) {
       // Releases are returned newest first; drafts have no published_at.
@@ -29,7 +35,7 @@ export class ReleaseAdapter implements IReleaseAdapter {
         {
           until: payload =>
             isBeforeWindow(
-              windowStart,
+              fetchFrom,
               payload.published_at ?? payload.created_at
             )
         }

@@ -1,60 +1,52 @@
-//
-
 import type {Release} from './types/Release'
 import type {ReleaseLogEntry} from './types/LogEntry'
 import {isoTimestamp} from './types/Timestamp'
+import {inWindow} from './MetricsWindow'
+import type {MetricOptions, MetricsWindow} from './MetricsWindow'
 
 // The number of milliseconds in one day
 const ONE_DAY = 1000 * 60 * 60 * 24
 
 export class DeployFrequency {
   log: ReleaseLogEntry[] = []
-  today: Date = new Date()
-  rList: Release[] = new Array<Release>()
+  rList: Release[]
+  private readonly window: MetricsWindow
 
   getLog(): ReleaseLogEntry[] {
     return this.log
   }
 
-  constructor(releases: Release[] | null, dateString: string | null = null) {
-    this.rList = releases as Release[]
-    if (this.rList === null || this.rList.length === 0) {
+  constructor(releases: Release[] | null, options: MetricOptions) {
+    if (releases === null || releases.length === 0) {
       throw new Error('Empty release list')
     }
-
-    if (dateString !== null) {
-      this.today = new Date(dateString)
-    }
+    this.rList = releases
+    this.window = options.window
   }
 
+  // Releases published in the last seven days of the window.
   weekly(): number {
-    let releaseCount = 0
-    for (const release of this.rList) {
-      const relDate = new Date(release.publishedAt)
-      if (this.days_between(this.today, relDate) < 8) {
-        this.log.push(this.entry(release))
-        releaseCount++
-      }
-    }
-
-    return releaseCount
+    return this.count({from: this.window.to - 7 * ONE_DAY, to: this.window.to})
   }
 
   monthly(): number {
+    return this.count(this.window)
+  }
+
+  // Releases per week over the 30-day window, two decimals.
+  rate(): string {
+    return (Math.round(this.monthly() * 700) / 3000).toFixed(2)
+  }
+
+  private count(window: Pick<MetricsWindow, 'from' | 'to'>): number {
     let releaseCount = 0
     for (const release of this.rList) {
-      const relDate = new Date(release.publishedAt)
-      if (this.days_between(this.today, relDate) < 31) {
+      if (inWindow(window, release.publishedAt)) {
         this.log.push(this.entry(release))
         releaseCount++
       }
     }
-
     return releaseCount
-  }
-
-  rate(): string {
-    return (Math.round(this.monthly() * 700) / 3000).toFixed(2)
   }
 
   private entry(release: Release): ReleaseLogEntry {
@@ -64,13 +56,5 @@ export class DeployFrequency {
       at: isoTimestamp(release.publishedAt),
       name: release.name
     }
-  }
-
-  private days_between(date1: Date, date2: Date): number {
-    // Calculate the difference in milliseconds
-    const differenceMs = Math.abs(date1.valueOf() - date2.valueOf())
-
-    // Convert back to days and return
-    return Math.round(differenceMs / ONE_DAY)
   }
 }

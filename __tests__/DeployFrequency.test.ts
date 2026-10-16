@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import type {Release} from '../src/types/Release'
 import type {GitHubReleasePayload} from '../src/github/payloads'
 import {toRelease} from '../src/github/mappers'
+import {windowAt} from './helpers/domain'
 
 function loadReleases(file: string, repo: string): Release[] {
   return (
@@ -26,43 +27,57 @@ describe('Deploy frequency should', () => {
     'devops-metrics-action'
   )
   it('calculate releases pr week for release less than 1 week', () => {
-    const df = new DeployFrequency(releaseList2, '2023-04-14T22:33:11Z')
+    const df = new DeployFrequency(releaseList2, {
+      window: windowAt('2023-04-14T22:33:11Z')
+    })
     const wr = df.weekly()
 
     expect(wr).toBe(1)
   })
   it('calculate releases pr week for release more than 1 week ago', () => {
-    const df = new DeployFrequency(releaseList2, '2023-04-24T22:33:11Z')
+    const df = new DeployFrequency(releaseList2, {
+      window: windowAt('2023-04-24T22:33:11Z')
+    })
     const wr = df.weekly()
 
     expect(wr).toBe(1)
   })
   it('calculate releases pr week for release this week based on large list', () => {
-    const df = new DeployFrequency(releaseList7, '2023-05-01T22:33:11Z')
+    const df = new DeployFrequency(releaseList7, {
+      window: windowAt('2023-05-01T22:33:11Z')
+    })
     const wr = df.weekly()
 
     expect(wr).toBe(5)
   })
   it('monthly calculate releases pr week for release more than 1 week ago', () => {
-    const df = new DeployFrequency(releaseList2, '2023-04-24T22:33:11Z')
+    const df = new DeployFrequency(releaseList2, {
+      window: windowAt('2023-04-24T22:33:11Z')
+    })
     const mr = df.monthly()
 
     expect(mr).toBe(2)
   })
   it('calculate release rate last month', () => {
-    const df = new DeployFrequency(releaseList2, '2023-04-14T22:33:11Z')
+    const df = new DeployFrequency(releaseList2, {
+      window: windowAt('2023-04-24T22:33:11Z')
+    })
     const rr = df.rate()
 
     expect(rr).toBe('0.47')
   })
   it('calculate release rate last month based on 7 releases list', () => {
-    const df = new DeployFrequency(releaseList7, '2023-05-14T22:33:11Z')
+    const df = new DeployFrequency(releaseList7, {
+      window: windowAt('2023-05-14T22:33:11Z')
+    })
     const rr = df.rate()
 
     expect(rr).toBe('1.40')
   })
   it('calculate release rate next month', () => {
-    const df = new DeployFrequency(releaseList2, '2023-05-23T22:33:11Z')
+    const df = new DeployFrequency(releaseList2, {
+      window: windowAt('2023-05-23T22:33:11Z')
+    })
     const rr = df.rate()
 
     expect(rr).toBe('0.00')
@@ -86,13 +101,17 @@ describe('Deploy frequency should', () => {
     expect(t).toThrow('Empty release list')
   })
   it('get an empty log of releases', () => {
-    const df = new DeployFrequency(releaseList7, '2023-05-14T22:33:11Z')
+    const df = new DeployFrequency(releaseList7, {
+      window: windowAt('2023-05-14T22:33:11Z')
+    })
 
     expect(df.getLog().length).toBe(0)
   })
 
   it('get release log list weekly when rate calculated', () => {
-    const df = new DeployFrequency(releaseList7, '2023-05-01T22:33:11Z')
+    const df = new DeployFrequency(releaseList7, {
+      window: windowAt('2023-05-01T22:33:11Z')
+    })
 
     df.weekly()
 
@@ -100,7 +119,9 @@ describe('Deploy frequency should', () => {
   })
 
   it('get release log list monthly when rate calculated', () => {
-    const df = new DeployFrequency(releaseList7, '2023-05-14T22:33:11Z')
+    const df = new DeployFrequency(releaseList7, {
+      window: windowAt('2023-05-14T22:33:11Z')
+    })
 
     df.monthly()
 
@@ -108,7 +129,9 @@ describe('Deploy frequency should', () => {
   })
 
   it('get release log list when rate calculated', () => {
-    const df = new DeployFrequency(releaseList7, '2023-05-14T22:33:11Z')
+    const df = new DeployFrequency(releaseList7, {
+      window: windowAt('2023-05-14T22:33:11Z')
+    })
 
     df.rate()
 
@@ -116,7 +139,9 @@ describe('Deploy frequency should', () => {
   })
 
   it('log release name and date weekly', () => {
-    const df = new DeployFrequency(releaseList2, '2023-04-23T22:33:11Z')
+    const df = new DeployFrequency(releaseList2, {
+      window: windowAt('2023-04-23T22:33:11Z')
+    })
 
     df.weekly()
 
@@ -131,7 +156,9 @@ describe('Deploy frequency should', () => {
   })
 
   it('log release name and date monthly', () => {
-    const df = new DeployFrequency(releaseList2, '2023-04-23T22:33:11Z')
+    const df = new DeployFrequency(releaseList2, {
+      window: windowAt('2023-04-23T22:33:11Z')
+    })
 
     df.monthly()
 

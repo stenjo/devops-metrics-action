@@ -2,11 +2,16 @@ import type {GitHubPullRequestPayload} from '../src/github/payloads'
 import {PullRequestsAdapter} from '../src/PullRequestsAdapter'
 import {GitHubClient} from '../src/GitHubClient'
 import fs from 'node:fs'
+import {windowAt} from './helpers/domain'
 
 test('PullRequestsAdapter should', async () => {
   const client = new GitHubClient()
-  const pullRequests = new PullRequestsAdapter(client, 'stenjo', ['dora'])
-  pullRequests.today = new Date('2023-05-20T00:00:00Z')
+  const pullRequests = new PullRequestsAdapter(
+    client,
+    'stenjo',
+    ['dora'],
+    windowAt('2023-05-20T00:00:00Z')
+  )
   vi.spyOn(client, 'request').mockImplementation(
     async (_route, params): Promise<GitHubPullRequestPayload[]> => {
       const page = params?.page as number

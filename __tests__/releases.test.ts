@@ -3,10 +3,16 @@ import {GitHubClient} from '../src/GitHubClient'
 import type {Release} from '../src/types/Release'
 import type {GitHubReleasePayload} from '../src/github/payloads'
 import fs from 'node:fs'
+import {windowAt} from './helpers/domain'
 
 describe('Mocked Release API should', () => {
   it('return releases mapped to the domain type', async () => {
-    const r = new ReleaseAdapter(new GitHubClient(), 'TestOwner', ['Project1'])
+    const r = new ReleaseAdapter(
+      new GitHubClient(),
+      'TestOwner',
+      ['Project1'],
+      windowAt()
+    )
     mockedGetReleasesReturns('./__tests__/test-data/releases.json')
 
     const releases: Release[] = await r.GetAllReleasesLastMonth()

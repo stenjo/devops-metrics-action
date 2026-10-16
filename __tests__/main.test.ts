@@ -18,6 +18,7 @@ import type {ActionsContext, Inputs} from '../src/main'
 import type {Release} from '../src/types/Release'
 import type {PullRequest} from '../src/types/PullRequest'
 import type {Issue} from '../src/types/Issue'
+import {metricsWindow} from '../src/MetricsWindow'
 
 vi.mock('@actions/core')
 vi.mock('../src/ReleaseAdapter')
@@ -519,6 +520,8 @@ describe('parseInputs', () => {
 
 describe('run', () => {
   const client = {} as GitHubClient
+  const NOW = new Date('2024-03-01T12:00:00Z')
+  const WINDOW = metricsWindow(NOW)
 
   function inputsWith(overrides: Partial<Inputs> = {}): Inputs {
     return {
@@ -536,8 +539,13 @@ describe('run', () => {
   const mockPRs = [{}, {}] as PullRequest[]
   const mockIssues = [{}, {}] as Issue[]
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useFakeTimers({now: NOW, toFake: ['Date']})
     ;(
       ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
     ).mockResolvedValue(mockReleases)
@@ -599,18 +607,43 @@ describe('run', () => {
     ])
   })
 
-  it('wires the injected client, owner and repositories into every adapter', async () => {
+  it('wires the injected client, owner, repositories and window into every adapter', async () => {
     const inputs = inputsWith({owner: 'o', repositories: ['repo1', 'repo2']})
 
     await run({inputs, client, core: fakeCore({})})
 
-    expect(ReleaseAdapter).toHaveBeenCalledWith(client, 'o', ['repo1', 'repo2'])
-    expect(PullRequestsAdapter).toHaveBeenCalledWith(client, 'o', [
-      'repo1',
-      'repo2'
-    ])
+    expect(ReleaseAdapter).toHaveBeenCalledWith(
+      client,
+      'o',
+      ['repo1', 'repo2'],
+      WINDOW
+    )
+    expect(PullRequestsAdapter).toHaveBeenCalledWith(
+      client,
+      'o',
+      ['repo1', 'repo2'],
+      WINDOW
+    )
     expect(CommitsAdapter).toHaveBeenCalledWith(client)
-    expect(IssuesAdapter).toHaveBeenCalledWith(client, 'o', ['repo1', 'repo2'])
+    expect(IssuesAdapter).toHaveBeenCalledWith(
+      client,
+      'o',
+      ['repo1', 'repo2'],
+      WINDOW
+    )
+  })
+
+  it('builds one window from the clock and shares the same object everywhere', async () => {
+    await run({inputs: inputsWith(), client, core: fakeCore({})})
+
+    const window = vi.mocked(ReleaseAdapter).mock.calls[0][3]
+    expect(window).toEqual(WINDOW)
+    expect(vi.mocked(PullRequestsAdapter).mock.calls[0][3]).toBe(window)
+    expect(vi.mocked(IssuesAdapter).mock.calls[0][3]).toBe(window)
+    expect(vi.mocked(DeployFrequency).mock.calls[0][1].window).toBe(window)
+    expect(vi.mocked(LeadTime).mock.calls[0][3].window).toBe(window)
+    expect(vi.mocked(ChangeFailureRate).mock.calls[0][2].window).toBe(window)
+    expect(vi.mocked(MeanTimeToRestore).mock.calls[0][2].window).toBe(window)
   })
 
   it('feeds the fetched releases, pulls, commits and issues into the metrics', async () => {
@@ -618,26 +651,19 @@ describe('run', () => {
     await run({inputs: inputsWith(), client, core: fake})
 
     const commits = vi.mocked(CommitsAdapter).mock.instances[0]
-    expect(DeployFrequency).toHaveBeenCalledWith(mockReleases)
-    expect(LeadTime).toHaveBeenCalledWith(
-      mockPRs,
-      mockReleases,
-      commits,
-      null,
-      fake
-    )
-    expect(ChangeFailureRate).toHaveBeenCalledWith(
-      mockIssues,
-      mockReleases,
-      null,
-      'bug'
-    )
-    expect(MeanTimeToRestore).toHaveBeenCalledWith(
-      mockIssues,
-      mockReleases,
-      null,
-      'bug'
-    )
+    expect(DeployFrequency).toHaveBeenCalledWith(mockReleases, {window: WINDOW})
+    expect(LeadTime).toHaveBeenCalledWith(mockPRs, mockReleases, commits, {
+      window: WINDOW,
+      logger: fake
+    })
+    expect(ChangeFailureRate).toHaveBeenCalledWith(mockIssues, mockReleases, {
+      window: WINDOW,
+      bugLabel: 'bug'
+    })
+    expect(MeanTimeToRestore).toHaveBeenCalledWith(mockIssues, mockReleases, {
+      window: WINDOW,
+      bugLabel: 'bug'
+    })
   })
 
   it('sets and returns all outputs including logs when logging is enabled', async () => {
@@ -708,18 +734,14 @@ describe('run', () => {
 
     await run({inputs: inputsWith(), client, core: fake})
 
-    expect(ChangeFailureRate).toHaveBeenCalledWith(
-      [],
-      mockReleases,
-      null,
-      'bug'
-    )
-    expect(MeanTimeToRestore).toHaveBeenCalledWith(
-      [],
-      mockReleases,
-      null,
-      'bug'
-    )
+    expect(ChangeFailureRate).toHaveBeenCalledWith([], mockReleases, {
+      window: WINDOW,
+      bugLabel: 'bug'
+    })
+    expect(MeanTimeToRestore).toHaveBeenCalledWith([], mockReleases, {
+      window: WINDOW,
+      bugLabel: 'bug'
+    })
   })
 
   /* eslint-disable @typescript-eslint/unbound-method */
@@ -773,18 +795,14 @@ describe('run', () => {
       core: fakeCore({})
     })
 
-    expect(ChangeFailureRate).toHaveBeenCalledWith(
-      mockIssues,
-      mockReleases,
-      null,
-      'incident'
-    )
-    expect(MeanTimeToRestore).toHaveBeenCalledWith(
-      mockIssues,
-      mockReleases,
-      null,
-      'incident'
-    )
+    expect(ChangeFailureRate).toHaveBeenCalledWith(mockIssues, mockReleases, {
+      window: WINDOW,
+      bugLabel: 'incident'
+    })
+    expect(MeanTimeToRestore).toHaveBeenCalledWith(mockIssues, mockReleases, {
+      window: WINDOW,
+      bugLabel: 'incident'
+    })
   })
 
   it('logs the remaining rate limit once, after the outputs are set', async () => {

@@ -5,9 +5,11 @@ import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
 import type {PullRequest} from '../src/types/PullRequest'
 import type {GitHubPullRequestPayload} from '../src/github/payloads'
 import {pullRequestPayload} from './helpers/payloads'
+import {windowAt} from './helpers/domain'
 
-// Window start is 61 days earlier: 2023-12-31T12:00:00Z.
+// fetchFrom is 60 days earlier (30-day window + 30-day look-back): 2024-01-01T12:00:00Z.
 const TODAY = new Date('2024-03-01T12:00:00Z')
+const WINDOW = windowAt(TODAY)
 const IN_WINDOW = '2024-02-01T00:00:00Z'
 const BEFORE_WINDOW = '2023-12-01T00:00:00Z'
 
@@ -42,10 +44,12 @@ describe('PullRequest Adapter should', () => {
   })
 
   it('return paged values', async () => {
-    const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
-      'project1'
-    ])
-    r.today = TODAY
+    const r = new PullRequestsAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const pullRequests: PullRequest[] = await r.GetAllPRsLastMonth()
 
@@ -68,9 +72,9 @@ describe('PullRequest Adapter should', () => {
     const r = new PullRequestsAdapter(
       new GitHubClient({token: 'my-token'}),
       'test-owner',
-      ['project1']
+      ['project1'],
+      WINDOW
     )
-    r.today = TODAY
 
     await r.GetAllPRsLastMonth()
 
@@ -121,10 +125,12 @@ describe('PullRequest Adapter should', () => {
         }
       )
     )
-    const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
-      'project1'
-    ])
-    r.today = TODAY
+    const r = new PullRequestsAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const pullRequests = await r.GetAllPRsLastMonth()
 
@@ -143,10 +149,12 @@ describe('PullRequest Adapter should', () => {
         ])
       )
     )
-    const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
-      'project1'
-    ])
-    r.today = TODAY
+    const r = new PullRequestsAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const pullRequests = await r.GetAllPRsLastMonth()
 
@@ -168,10 +176,12 @@ describe('PullRequest Adapter should', () => {
         }
       )
     )
-    const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
-      'project1'
-    ])
-    r.today = TODAY
+    const r = new PullRequestsAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const pullRequests = await r.GetAllPRsLastMonth()
 
@@ -189,9 +199,12 @@ describe('PullRequest Adapter should', () => {
         () => new HttpResponse('access denied', {status: 401})
       )
     )
-    const r = new PullRequestsAdapter(new GitHubClient(), 'test-owner', [
-      'project1'
-    ])
+    const r = new PullRequestsAdapter(
+      new GitHubClient(),
+      'test-owner',
+      ['project1'],
+      WINDOW
+    )
 
     const error = await r.GetAllPRsLastMonth().catch((e: unknown) => e)
 
