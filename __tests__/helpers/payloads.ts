@@ -24,6 +24,7 @@ export function pullRequestPayload(
     number: 1,
     title: 'feat: something',
     merged_at: '2023-04-28T17:50:53Z',
+    updated_at: '2023-04-28T17:50:53Z',
     base: {ref: 'main', repo: {name: 'r'}},
     ...overrides
   } as GitHubPullRequestPayload

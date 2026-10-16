@@ -9,6 +9,11 @@ import type {
 } from '../src/github/payloads'
 import {releasePayload} from './helpers/payloads'
 
+// Window start is 61 days earlier: 2023-12-31T12:00:00Z.
+const TODAY = new Date('2024-03-01T12:00:00Z')
+const IN_WINDOW = '2024-02-01T00:00:00Z'
+const BEFORE_WINDOW = '2023-12-01T00:00:00Z'
+
 const server = setupServer(
   http.get(
     'https://api.github.com/repos/:owner/:rep/releases',
@@ -49,7 +54,7 @@ const server = setupServer(
           draft: false,
           prerelease: false,
           created_at: '',
-          published_at: '2024-02-01T00:00:00Z',
+          published_at: IN_WINDOW,
           assets: [],
           tarball_url: '',
           zipball_url: '',
@@ -78,6 +83,7 @@ describe('Release Adapter should', () => {
 
   it('return paged values mapped to the domain type', async () => {
     const r = new ReleaseAdapter(new GitHubClient(), 'Test-Owner', ['Project1'])
+    r.today = TODAY
 
     const releases: Release[] = await r.GetAllReleasesLastMonth()
 
@@ -85,7 +91,7 @@ describe('Release Adapter should', () => {
     expect(releases[1]).toEqual({
       repo: 'test-owner/project1',
       name: 'v1',
-      publishedAt: +new Date('2024-02-01T00:00:00Z')
+      publishedAt: +new Date(IN_WINDOW)
     })
   })
 
@@ -94,13 +100,16 @@ describe('Release Adapter should', () => {
       http.get(
         'https://api.github.com/repos/:owner/:repo/releases',
         ({params}) =>
-          HttpResponse.json([releasePayload({name: `${params.repo}`})])
+          HttpResponse.json([
+            releasePayload({name: `${params.repo}`, published_at: IN_WINDOW})
+          ])
       )
     )
     const r = new ReleaseAdapter(new GitHubClient(), 'o', [
       'api',
       'api-gateway'
     ])
+    r.today = TODAY
 
     const releases = await r.GetAllReleasesLastMonth()
 
@@ -110,14 +119,16 @@ describe('Release Adapter should', () => {
     ])
   })
 
-  it('request releases since 61 days back with auth and api-version headers', async () => {
+  it('request releases without a since parameter, with auth and api-version headers', async () => {
     const seen: Request[] = []
     server.use(
       http.get(
         'https://api.github.com/repos/:owner/:rep/releases',
         ({request}) => {
           seen.push(request)
-          return HttpResponse.json([releasePayload({id: 1})])
+          return HttpResponse.json([
+            releasePayload({id: 1, published_at: IN_WINDOW})
+          ])
         }
       )
     )
@@ -126,19 +137,106 @@ describe('Release Adapter should', () => {
       'test-owner',
       ['project1']
     )
-    r.today = new Date('2024-03-01T12:00:00Z')
+    r.today = TODAY
 
     await r.GetAllReleasesLastMonth()
 
     expect(seen.length).toBe(1)
     const url = new URL(seen[0].url)
     expect(url.pathname).toBe('/repos/test-owner/project1/releases')
-    expect(url.searchParams.get('state')).toBe('all')
-    expect(url.searchParams.get('since')).toBe('2023-12-31T12:00:00.000Z')
+    expect([...url.searchParams.keys()].sort()).toEqual(['page', 'per_page'])
     expect(url.searchParams.get('per_page')).toBe('100')
     expect(url.searchParams.get('page')).toBe('1')
     expect(seen[0].headers.get('authorization')).toBe('token my-token')
     expect(seen[0].headers.get('x-github-api-version')).toBe('2022-11-28')
+  })
+
+  it('stop requesting pages once a page holds a release older than the window', async () => {
+    const pages: string[] = []
+    server.use(
+      http.get(
+        'https://api.github.com/repos/:owner/:rep/releases',
+        ({request}) => {
+          const page = new URL(request.url).searchParams.get('page') as string
+          pages.push(page)
+          const items = Array.from({length: 100}, (_, i) =>
+            releasePayload({
+              name: `p${page}-${i.toString()}`,
+              published_at: IN_WINDOW
+            })
+          )
+          if (page === '2') {
+            items[98] = releasePayload({
+              name: 'old-1',
+              published_at: BEFORE_WINDOW
+            })
+            items[99] = releasePayload({
+              name: 'old-2',
+              published_at: BEFORE_WINDOW
+            })
+          }
+          return HttpResponse.json(items)
+        }
+      )
+    )
+    const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
+    r.today = TODAY
+
+    const releases = await r.GetAllReleasesLastMonth()
+
+    expect(pages).toEqual(['1', '2'])
+    expect(releases.length).toBe(198)
+    expect(releases.map(x => x.name)).not.toContain('old-1')
+    expect(releases.at(-1)?.name).toBe('p2-97')
+  })
+
+  it('keep a release published exactly 60 days ago and drop one 62 days ago', async () => {
+    server.use(
+      http.get('https://api.github.com/repos/:owner/:rep/releases', () =>
+        HttpResponse.json([
+          releasePayload({name: 'kept', published_at: '2024-01-01T12:00:00Z'}),
+          releasePayload({
+            name: 'dropped',
+            published_at: '2023-12-30T12:00:00Z'
+          })
+        ])
+      )
+    )
+    const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
+    r.today = TODAY
+
+    const releases = await r.GetAllReleasesLastMonth()
+
+    expect(releases.map(x => x.name)).toEqual(['kept'])
+  })
+
+  it('judge drafts without published_at by created_at', async () => {
+    server.use(
+      http.get('https://api.github.com/repos/:owner/:rep/releases', () =>
+        HttpResponse.json([
+          releasePayload({
+            name: 'recent-draft',
+            draft: true,
+            published_at: null,
+            created_at: IN_WINDOW
+          }),
+          releasePayload({name: 'v1', published_at: IN_WINDOW}),
+          releasePayload({
+            name: 'old-draft',
+            draft: true,
+            published_at: null,
+            created_at: BEFORE_WINDOW
+          }),
+          releasePayload({name: 'v0', published_at: IN_WINDOW})
+        ])
+      )
+    )
+    const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
+    r.today = TODAY
+
+    const releases = await r.GetAllReleasesLastMonth()
+
+    expect(releases.map(x => x.name)).toEqual(['recent-draft', 'v1'])
   })
 
   it('request pages 1 to 99 at most when every page is full', async () => {
@@ -149,12 +247,15 @@ describe('Release Adapter should', () => {
         ({request}) => {
           pages.push(new URL(request.url).searchParams.get('page') as string)
           return HttpResponse.json(
-            Array.from({length: 100}, (_, i) => releasePayload({id: i}))
+            Array.from({length: 100}, (_, i) =>
+              releasePayload({id: i, published_at: IN_WINDOW})
+            )
           )
         }
       )
     )
     const r = new ReleaseAdapter(new GitHubClient(), 'test-owner', ['project1'])
+    r.today = TODAY
 
     const releases = await r.GetAllReleasesLastMonth()
 
@@ -179,7 +280,7 @@ describe('Release Adapter should', () => {
     expect(error).toBeInstanceOf(GitHubApiError)
     expect(error).toMatchObject({
       message:
-        'GitHub API request failed (401) for GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}',
+        'GitHub API request failed (401) for GET /repos/{owner}/{repo}/releases',
       status: 401
     })
   })

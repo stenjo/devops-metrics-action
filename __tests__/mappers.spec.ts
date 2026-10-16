@@ -50,6 +50,12 @@ describe('toRelease', () => {
         .name
     ).toBe('')
   })
+
+  it('maps an unpublished draft to epoch 0', () => {
+    expect(
+      toRelease('o', 'r', releasePayload({published_at: null})).publishedAt
+    ).toBe(0)
+  })
 })
 
 describe('toPullRequest', () => {

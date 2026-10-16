@@ -43,7 +43,7 @@ describe('run() with a failing GitHub API', () => {
 
     expect(error).toBeInstanceOf(GitHubApiError)
     expect((error as GitHubApiError).message).toBe(
-      'GitHub API request failed (403) for GET /repos/{owner}/{repo}/releases?state=all&since={since}&per_page={per_page}&page={page}'
+      'GitHub API request failed (403) for GET /repos/{owner}/{repo}/releases'
     )
     expect((error as GitHubApiError).message).not.toContain('Forbidden')
     expect((error as GitHubApiError).cause).toBe(forbidden)

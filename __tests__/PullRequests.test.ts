@@ -6,6 +6,7 @@ import fs from 'node:fs'
 test('PullRequestsAdapter should', async () => {
   const client = new GitHubClient()
   const pullRequests = new PullRequestsAdapter(client, 'stenjo', ['dora'])
+  pullRequests.today = new Date('2023-05-20T00:00:00Z')
   vi.spyOn(client, 'request').mockImplementation(
     async (_route, params): Promise<GitHubPullRequestPayload[]> => {
       const page = params?.page as number
