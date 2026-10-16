@@ -37790,22 +37790,65 @@ function serializeLog(entries, limits = defaultLogLimits()) {
 
 
 const TOKEN_REQUIRED_MESSAGE = 'A GitHub token is required: set the `token` input or the GH_TOKEN environment variable';
+// GitHub owner and repository names: letters, digits, '_', '.', '-'; 1–100 chars.
+function validateName(kind, value) {
+    if (!/^[A-Za-z0-9_.-]{1,100}$/.test(value) || value.includes('..')) {
+        throw new Error(`Invalid ${kind} ${JSON.stringify(value)}: GitHub names may only contain letters, digits, "_", "." and "-" (1-100 characters) and must not contain ".."`);
+    }
+    return value;
+}
+// Accepts `name` or `owner/name`; the owner part must agree with the owner input.
+function parseRepoEntry(entry, owner) {
+    const parts = entry.split('/');
+    if (parts.length > 2) {
+        throw new Error(`Invalid repo ${JSON.stringify(entry)}: expected "name" or "owner/name"`);
+    }
+    if (parts.length === 2) {
+        const entryOwner = validateName('owner', parts[0]);
+        if (entryOwner.toLowerCase() !== owner.toLowerCase()) {
+            throw new Error(`Repo ${JSON.stringify(entry)} names owner ${JSON.stringify(entryOwner)} but the owner input is ${JSON.stringify(owner)}`);
+        }
+    }
+    return validateName('repo', parts[parts.length - 1]);
+}
+function parseBugLabel(value) {
+    const label = value.trim();
+    if (label === '') {
+        return 'bug';
+    }
+    if (label.length > 50) {
+        throw new Error(`Invalid bug-label ${JSON.stringify(label)}: must be at most 50 characters`);
+    }
+    return label;
+}
+// Only the literal 'true' enables a flag; anything else is off, loudly if unrecognised.
+function parseFlag(core, name) {
+    const value = core.getInput(name);
+    if (value === 'true') {
+        return true;
+    }
+    if (value !== '' && value !== 'false') {
+        core.warning(`Unrecognised value ${JSON.stringify(value)} for input '${name}': expected 'true' or 'false', treating it as false`);
+    }
+    return false;
+}
 function parseInputs(core, context, env) {
     let repo = core.getInput('repo');
     if (repo === '' || repo === null) {
         repo = context.repo.repo;
         core.info(`${context.repo.repo} - default repo.`);
     }
-    // Allow for multiple repos, ex: [val1, val2, val3]
-    const repositories = repo
-        .split(/[[\]\n,]+/)
-        .map(s => s.trim())
-        .filter(x => x !== '');
     let owner = core.getInput('owner');
     if (owner === '' || owner === null) {
         owner = context.repo.owner;
         core.info(`${context.repo.owner} - default owner.`);
     }
+    owner = validateName('owner', owner);
+    // Allow for multiple repos, ex: [val1, val2, val3], one per line or space separated
+    const repositories = repo
+        .split(/[[\]\s,]+/)
+        .filter(x => x !== '')
+        .map(entry => parseRepoEntry(entry, owner));
     for (const repository of repositories) {
         core.info(`${owner}/${repository}`);
     }
@@ -37829,9 +37872,9 @@ function parseInputs(core, context, env) {
         owner,
         repositories,
         token,
-        logging: core.getInput('logging') === 'true',
-        filtered: core.getInput('filtered') === 'true',
-        bugLabel: core.getInput('bug-label') || 'bug'
+        logging: parseFlag(core, 'logging'),
+        filtered: parseFlag(core, 'filtered'),
+        bugLabel: parseBugLabel(core.getInput('bug-label'))
     };
 }
 async function run({ inputs, client, core }) {

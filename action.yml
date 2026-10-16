@@ -6,10 +6,13 @@ branding:
   color: 'green'
 inputs:
   owner: # organization
-    description: 'Owner of the repo. Org or user'
+    description: 'Owner of the repo. Org or user. Validated against GitHub
+      naming rules (letters, digits, "_", ".", "-"; 1-100 chars; no "..")'
     required: false
   repo: # repository
-    description: 'Repository name'
+    description: 'Repository name(s), separated by comma, whitespace or given
+      as a list. Entries may be "name" or "owner/name"; each part is validated
+      against GitHub naming rules before any API call'
     required: false
   token: # repository
     description: 'Repository access token. Falls back to the GH_TOKEN
@@ -18,14 +21,16 @@ inputs:
     default: ${{ github.token }}
   logging: # history
     description: 'Emit the *-log outputs (JSON arrays of the releases and pull
-      requests behind each metric) when true'
+      requests behind each metric) when exactly "true"; other values warn and
+      count as false'
     required: false
   filtered:
-    description: 'Filtering only feat and fix as basis for lead time'
+    description: 'Filtering only feat and fix as basis for lead time when
+      exactly "true"; other values warn and count as false'
     required: false
   bug-label:
     description: 'Issue label that identifies a bug/incident for mttr and
-      change-failure-rate'
+      change-failure-rate. Trimmed; at most 50 characters'
     required: false
     default: 'bug'
 outputs:

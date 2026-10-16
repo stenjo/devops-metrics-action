@@ -149,4 +149,67 @@ describe('index.ts token resolution (real parseInputs)', () => {
     )
     expect(core.setFailed).not.toHaveBeenCalled()
   })
+
+  it('fails with a validation message before any API call when repo is a path traversal', async () => {
+    process.env.GH_TOKEN = 'env-secret'
+    vi.mocked(core.getInput).mockImplementation((name: string) =>
+      name === 'repo' ? '../../x' : name === 'owner' ? 'o' : ''
+    )
+
+    await importIndex()
+
+    expect(core.setFailed).toHaveBeenCalledExactlyOnceWith(
+      'Invalid repo "../../x": expected "name" or "owner/name"'
+    )
+    expect(GitHubClient).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('resolves an owner/repo entry and runs against the repo name', async () => {
+    process.env.GH_TOKEN = 'env-secret'
+    vi.mocked(core.getInput).mockImplementation((name: string) =>
+      name === 'repo'
+        ? 'stenjo/devops-metrics-action'
+        : name === 'owner'
+          ? 'stenjo'
+          : ''
+    )
+
+    await importIndex()
+
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputs: expect.objectContaining({
+          owner: 'stenjo',
+          repositories: ['devops-metrics-action']
+        }) as Inputs
+      })
+    )
+    expect(core.setFailed).not.toHaveBeenCalled()
+  })
+
+  it('warns and treats an unrecognised logging value as false', async () => {
+    process.env.GH_TOKEN = 'env-secret'
+    vi.mocked(core.getInput).mockImplementation((name: string) =>
+      name === 'repo'
+        ? 'repo1'
+        : name === 'owner'
+          ? 'o'
+          : name === 'logging'
+            ? 'yes'
+            : ''
+    )
+
+    await importIndex()
+
+    expect(core.warning).toHaveBeenCalledExactlyOnceWith(
+      `Unrecognised value "yes" for input 'logging': expected 'true' or 'false', treating it as false`
+    )
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputs: expect.objectContaining({logging: false}) as Inputs
+      })
+    )
+    expect(core.setFailed).not.toHaveBeenCalled()
+  })
 })
