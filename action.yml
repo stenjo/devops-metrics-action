@@ -47,21 +47,22 @@ outputs:
     description: 'Mean time to restore (days)'
 
   deploy-rate-log: # list of releases that forms the basis of the deployment rate
-    description: 'JSON array of {kind:"release", at, name} records if logging
-      true; sanitized and capped, ends with {kind:"truncated", omitted} when cut'
+    description: 'JSON array of {kind:"release", repo, at, name} records if
+      logging true; sanitized and capped, ends with {kind:"truncated", omitted}
+      when cut'
 
   lead-time-log: # list of pull requests that forms the basis of the lead-time
-    description: 'JSON array of {kind:"pull", at, title, commitAt,
+    description: 'JSON array of {kind:"pull", repo, at, title, commitAt,
       commitMessage, releaseAt, release, leadTimeDays} records if logging true;
       sanitized and capped, ends with {kind:"truncated", omitted} when cut'
 
   change-failure-rate-log: # list of failed releases and the bugs opened after them
-    description: 'JSON array of {kind:"failed-release", at, name, bugs:[{number,
-      title, createdAt}]} records if logging true; sanitized and capped, ends
-      with {kind:"truncated", omitted} when cut'
+    description: 'JSON array of {kind:"failed-release", repo, at, name,
+      bugs:[{number, title, createdAt}]} records if logging true; sanitized and
+      capped, ends with {kind:"truncated", omitted} when cut'
 
   mttr-log: # list of bugs and the releases that bound their restore time
-    description: 'JSON array of {kind:"restore", number, title, createdAt,
+    description: 'JSON array of {kind:"restore", repo, number, title, createdAt,
       closedAt, releaseBefore, releaseBeforeAt, releaseAfter, releaseAfterAt,
       restoreDays} records if logging true; sanitized and capped, ends with
       {kind:"truncated", omitted} when cut'

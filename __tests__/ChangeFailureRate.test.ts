@@ -256,6 +256,7 @@ describe('ChangeFailureRate should', () => {
       expect(cfr.getLog()).toEqual([
         {
           kind: 'failed-release',
+          repo: DORA,
           at: '2023-04-10T00:00:00Z',
           name: 'v1',
           bugs: [
@@ -265,6 +266,7 @@ describe('ChangeFailureRate should', () => {
         },
         {
           kind: 'failed-release',
+          repo: DORA,
           at: '2023-04-20T00:00:00Z',
           name: 'v2',
           bugs: [

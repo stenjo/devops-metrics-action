@@ -77,6 +77,7 @@ export class ChangeFailureRate {
           failedDeploys += 1
           this.log.push({
             kind: 'failed-release',
+            repo,
             at: isoTimestamp(release.publishedAt),
             name: release.name,
             bugs: bugsInInterval.map(bug => ({

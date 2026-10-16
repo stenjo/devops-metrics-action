@@ -16,7 +16,12 @@ const INJECTION = '`id` ${{ github.token }} $(rm -rf /)\necho pwned'
 const UNSAFE = /[`\n\r]|\$\{|\$\(/
 
 function releaseEntry(i: number): LogEntry {
-  return {kind: 'release', at: '2023-04-22T20:28:29Z', name: `v${i}`}
+  return {
+    kind: 'release',
+    repo: 'o/r',
+    at: '2023-04-22T20:28:29Z',
+    name: `v${i}`
+  }
 }
 
 function stringFields(value: unknown): string[] {
@@ -94,7 +99,12 @@ describe('serializeLog', () => {
   })
 
   it('measures multi-byte characters in bytes, not code units', () => {
-    const wide: LogEntry = {kind: 'release', at: 'x', name: '€€€€€€€€€€'}
+    const wide: LogEntry = {
+      kind: 'release',
+      repo: 'o/r',
+      at: 'x',
+      name: '€€€€€€€€€€'
+    }
     const bytes = Buffer.byteLength(JSON.stringify(wide))
     const chars = JSON.stringify(wide).length
     expect(bytes).toBeGreaterThan(chars)
@@ -109,6 +119,7 @@ describe('serializeLog', () => {
   it('never exceeds the default byte cap for 1,000 maximal pull records', () => {
     const big: PullLogEntry = {
       kind: 'pull',
+      repo: `${'O'.repeat(100)}/${'R'.repeat(100)}`,
       at: '2023-04-28T17:50:53Z',
       title: 'T'.repeat(200),
       commitAt: '2023-04-20T00:00:00Z',
@@ -171,6 +182,7 @@ describe('log outputs end to end', () => {
     expect(parsed).toEqual([
       {
         kind: 'release',
+        repo: 'o/r',
         at: '2023-04-30T17:50:53Z',
         name: 'id {{ github.token }} (rm -rf /) echo pwned'
       }

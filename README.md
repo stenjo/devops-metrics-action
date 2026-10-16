@@ -141,17 +141,26 @@ is enabled. See [Log outputs](#log-outputs).
 
 With `logging: true` the action also emits `deploy-rate-log`, `lead-time-log`,
 `change-failure-rate-log` and `mttr-log`. All are **JSON array strings** meant
-to be parsed with `fromJSON` or `jq`, never echoed as free text. Records look
-like:
+to be parsed with `fromJSON` or `jq`, never echoed as free text. Every record
+carries `repo` (`owner/repo`, lower-cased) so the records of a multi-repository
+run stay attributable. Records look like:
 
 ```json
-[{"kind": "release", "at": "2026-10-01T12:00:00Z", "name": "v1.4.1"}]
+[
+  {
+    "kind": "release",
+    "repo": "stenjo/devops-metrics-action",
+    "at": "2026-10-01T12:00:00Z",
+    "name": "v1.4.1"
+  }
+]
 ```
 
 ```json
 [
   {
     "kind": "pull",
+    "repo": "stenjo/devops-metrics-action",
     "at": "2026-09-30T09:12:00Z",
     "title": "feat: add thing",
     "commitAt": "2026-09-28T14:03:00Z",
@@ -167,6 +176,7 @@ like:
 [
   {
     "kind": "failed-release",
+    "repo": "stenjo/devops-metrics-action",
     "at": "2026-10-01T12:00:00Z",
     "name": "v1.4.1",
     "bugs": [
@@ -189,6 +199,7 @@ the failed-deploy count used in the rate.
 [
   {
     "kind": "restore",
+    "repo": "stenjo/devops-metrics-action",
     "number": 42,
     "title": "bug: crash on start",
     "createdAt": "2026-10-02T08:15:00Z",
@@ -213,7 +224,8 @@ The logs are safe by construction:
 - Every string field (`title`, `commitMessage`, `name`, `release`) is
   sanitized: control characters and newlines are removed, whitespace is
   collapsed, backticks and `${` / `$(` openers are stripped, and the text is
-  truncated to 200 characters with a trailing `…`.
+  truncated to 200 characters with a trailing `…`. `repo` is built from the
+  validated `owner` / `repo` inputs, never from API text.
 - Each log is capped at 500 records and just under 1 MiB (GitHub's output
   limit). When cut, the last record is `{"kind": "truncated", "omitted": n}`.
 
@@ -236,10 +248,10 @@ Use `fromJSON` to work with the records in expressions, or `jq` in a script:
     LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
   run: |
     {
-      echo '| Merged | Pull request | Released | Days |'
-      echo '| --- | --- | --- | --- |'
+      echo '| Repository | Merged | Pull request | Released | Days |'
+      echo '| --- | --- | --- | --- | --- |'
       jq -r '.[] | select(.kind == "pull")
-        | "| \(.at) | \(.title) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
+        | "| \(.repo) | \(.at) | \(.title) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
     } >> "$GITHUB_STEP_SUMMARY"
 
 - name: Failed releases behind the change failure rate
@@ -247,10 +259,10 @@ Use `fromJSON` to work with the records in expressions, or `jq` in a script:
     CFR_LOG: ${{ steps.dora.outputs.change-failure-rate-log }}
   run: |
     {
-      echo '| Published | Release | Bugs opened before next release |'
-      echo '| --- | --- | --- |'
+      echo '| Repository | Published | Release | Bugs opened before next release |'
+      echo '| --- | --- | --- | --- |'
       jq -r '.[] | select(.kind == "failed-release")
-        | "| \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title)"] | join("<br>")) |"' <<< "$CFR_LOG"
+        | "| \(.repo) | \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title)"] | join("<br>")) |"' <<< "$CFR_LOG"
     } >> "$GITHUB_STEP_SUMMARY"
 
 - name: Bugs behind the mean time to restore
@@ -258,10 +270,10 @@ Use `fromJSON` to work with the records in expressions, or `jq` in a script:
     MTTR_LOG: ${{ steps.dora.outputs.mttr-log }}
   run: |
     {
-      echo '| Bug | Opened | Closed | Release before | Release after | Days |'
-      echo '| --- | --- | --- | --- | --- | --- |'
+      echo '| Repository | Bug | Opened | Closed | Release before | Release after | Days |'
+      echo '| --- | --- | --- | --- | --- | --- | --- |'
       jq -r '.[] | select(.kind == "restore")
-        | "| #\(.number) \(.title) | \(.createdAt) | \(.closedAt) | \(.releaseBefore) | \(.releaseAfter) | \(.restoreDays) |"' <<< "$MTTR_LOG"
+        | "| \(.repo) | #\(.number) \(.title) | \(.createdAt) | \(.closedAt) | \(.releaseBefore) | \(.releaseAfter) | \(.restoreDays) |"' <<< "$MTTR_LOG"
     } >> "$GITHUB_STEP_SUMMARY"
 ```
 

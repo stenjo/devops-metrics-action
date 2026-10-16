@@ -60,6 +60,7 @@ export class DeployFrequency {
   private entry(release: Release): ReleaseLogEntry {
     return {
       kind: 'release',
+      repo: release.repo,
       at: isoTimestamp(release.publishedAt),
       name: release.name
     }
