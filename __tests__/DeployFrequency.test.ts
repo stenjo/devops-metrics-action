@@ -1,6 +1,6 @@
 //
 import {DeployFrequency} from '../src/DeployFrequency'
-import fs from 'fs'
+import fs from 'node:fs'
 import type {Release} from '../src/types/Release'
 import type {GitHubReleasePayload} from '../src/github/payloads'
 import {toRelease} from '../src/github/mappers'

@@ -6,7 +6,7 @@ import type {
   GitHubReleasePayload
 } from '../src/github/payloads'
 import {toIssue, toRelease} from '../src/github/mappers'
-import fs from 'fs'
+import fs from 'node:fs'
 import {ChangeFailureRate} from '../src/ChangeFailureRate'
 import {issue, release, ts} from './helpers/domain'
 

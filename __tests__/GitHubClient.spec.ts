@@ -8,9 +8,12 @@ describe('GitHubClient', () => {
 
   beforeEach(() => {
     mockRequest = vi.fn()
-    ;(Octokit as unknown as Mock).mockImplementation(function () {
-      return {request: mockRequest}
-    })
+    // A class, not an arrow function: the mock is invoked with `new`.
+    ;(Octokit as unknown as Mock).mockImplementation(
+      class {
+        request = mockRequest
+      }
+    )
   })
 
   afterEach(() => {

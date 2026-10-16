@@ -2,7 +2,7 @@ import {http, HttpResponse} from 'msw'
 import {setupServer} from 'msw/node'
 import {CommitsAdapter} from '../src/CommitsAdapter'
 import {GitHubClient, GitHubApiError} from '../src/GitHubClient'
-import fs from 'fs'
+import fs from 'node:fs'
 import type {Commit} from '../src/types/Commit'
 import type {GitHubCommitPayload} from '../src/github/payloads'
 

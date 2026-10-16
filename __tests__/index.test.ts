@@ -105,8 +105,6 @@ describe('index.ts bootstrap', () => {
 })
 
 describe('index.ts token resolution (real parseInputs)', () => {
-  const savedGhToken = process.env.GH_TOKEN
-
   beforeEach(async () => {
     vi.clearAllMocks()
     const actual =
@@ -118,15 +116,11 @@ describe('index.ts token resolution (real parseInputs)', () => {
   })
 
   afterEach(() => {
-    if (savedGhToken === undefined) {
-      delete process.env.GH_TOKEN
-    } else {
-      process.env.GH_TOKEN = savedGhToken
-    }
+    vi.unstubAllEnvs()
   })
 
   it('fails before building a client when neither the token input nor GH_TOKEN is set', async () => {
-    delete process.env.GH_TOKEN
+    vi.stubEnv('GH_TOKEN', undefined)
 
     await importIndex()
 
@@ -138,7 +132,7 @@ describe('index.ts token resolution (real parseInputs)', () => {
   })
 
   it('registers a GH_TOKEN-sourced token as a secret before building the client', async () => {
-    process.env.GH_TOKEN = 'env-secret'
+    vi.stubEnv('GH_TOKEN', 'env-secret')
 
     await importIndex()
 
@@ -151,7 +145,7 @@ describe('index.ts token resolution (real parseInputs)', () => {
   })
 
   it('fails with a validation message before any API call when repo is a path traversal', async () => {
-    process.env.GH_TOKEN = 'env-secret'
+    vi.stubEnv('GH_TOKEN', 'env-secret')
     vi.mocked(core.getInput).mockImplementation((name: string) =>
       name === 'repo' ? '../../x' : name === 'owner' ? 'o' : ''
     )
@@ -166,7 +160,7 @@ describe('index.ts token resolution (real parseInputs)', () => {
   })
 
   it('resolves an owner/repo entry and runs against the repo name', async () => {
-    process.env.GH_TOKEN = 'env-secret'
+    vi.stubEnv('GH_TOKEN', 'env-secret')
     vi.mocked(core.getInput).mockImplementation((name: string) =>
       name === 'repo'
         ? 'stenjo/devops-metrics-action'
@@ -189,7 +183,7 @@ describe('index.ts token resolution (real parseInputs)', () => {
   })
 
   it('warns and treats an unrecognised logging value as false', async () => {
-    process.env.GH_TOKEN = 'env-secret'
+    vi.stubEnv('GH_TOKEN', 'env-secret')
     vi.mocked(core.getInput).mockImplementation((name: string) =>
       name === 'repo'
         ? 'repo1'
