@@ -206,6 +206,126 @@ describe('ChangeFailureRate should', () => {
     })
   })
 
+  describe('log', () => {
+    const today = new Date('2023-05-01T00:00:00Z')
+
+    it('be empty before Cfr() runs and when nothing failed', () => {
+      const cfr = new ChangeFailureRate(
+        [bug('2023-04-05T00:00:00Z', DORA)],
+        [release('2023-04-10T00:00:00Z', DORA, 'v1')],
+        today
+      )
+
+      expect(cfr.getLog()).toEqual([])
+      expect(cfr.Cfr()).toBe(0)
+      expect(cfr.getLog()).toEqual([])
+    })
+
+    it('record one failed-release per counted interval with its bugs', () => {
+      const releases = [
+        release('2023-04-30T00:00:00Z', DORA, 'v3'),
+        release('2023-04-10T00:00:00Z', DORA, 'v1'),
+        release('2023-04-20T00:00:00Z', DORA, 'v2')
+      ]
+      const bugs = [
+        issue({
+          repo: DORA,
+          number: 7,
+          title: 'bug: crash',
+          createdAt: ts('2023-04-25T00:00:00Z'),
+          closedAt: null
+        }),
+        issue({
+          repo: DORA,
+          number: 5,
+          title: 'bug: slow',
+          createdAt: ts('2023-04-12T00:00:00Z'),
+          closedAt: null
+        }),
+        issue({
+          repo: DORA,
+          number: 6,
+          title: 'bug: wrong',
+          createdAt: ts('2023-04-15T00:00:00Z'),
+          closedAt: null
+        })
+      ]
+      const cfr = new ChangeFailureRate(bugs, releases, today)
+
+      expect(cfr.Cfr()).toBe(67)
+      expect(cfr.getLog()).toEqual([
+        {
+          kind: 'failed-release',
+          at: '2023-04-10T00:00:00Z',
+          name: 'v1',
+          bugs: [
+            {number: 5, title: 'bug: slow', createdAt: '2023-04-12T00:00:00Z'},
+            {number: 6, title: 'bug: wrong', createdAt: '2023-04-15T00:00:00Z'}
+          ]
+        },
+        {
+          kind: 'failed-release',
+          at: '2023-04-20T00:00:00Z',
+          name: 'v2',
+          bugs: [
+            {number: 7, title: 'bug: crash', createdAt: '2023-04-25T00:00:00Z'}
+          ]
+        }
+      ])
+    })
+
+    it('attribute a bug after the latest release to that release', () => {
+      const cfr = new ChangeFailureRate(
+        [bug('2023-04-30T17:50:53Z', DORA)],
+        [release('2023-04-30T16:50:53Z', DORA, 'v9')],
+        today
+      )
+
+      expect(cfr.Cfr()).toBe(100)
+      expect(cfr.getLog()).toHaveLength(1)
+      expect(cfr.getLog()[0]).toMatchObject({
+        at: '2023-04-30T16:50:53Z',
+        name: 'v9'
+      })
+    })
+
+    it('keep one record per repo interval and the count equal to failed deploys', () => {
+      const other = 'stenjo/other'
+      const releases = [
+        release('2023-04-10T00:00:00Z', DORA, 'd1'),
+        release('2023-04-20T00:00:00Z', DORA, 'd2'),
+        release('2023-04-12T00:00:00Z', other, 'o1')
+      ]
+      const cfr = new ChangeFailureRate(
+        [bug('2023-04-25T00:00:00Z', DORA), bug('2023-04-15T00:00:00Z', other)],
+        releases,
+        today
+      )
+
+      expect(cfr.Cfr()).toBe(67)
+      expect(cfr.getLog().map(e => `${e.name}@${e.at}`)).toEqual([
+        'd2@2023-04-20T00:00:00Z',
+        'o1@2023-04-12T00:00:00Z'
+      ])
+    })
+
+    it('match the fixture rate: failed intervals over releases in window', () => {
+      const cfr = new ChangeFailureRate(
+        fixtureIssues(),
+        fixtureReleases(),
+        new Date('2023-04-23T16:50:53Z')
+      )
+
+      expect(cfr.Cfr()).toBe(14)
+      expect(cfr.getLog()).toHaveLength(1)
+      expect(
+        Math.round((cfr.getLog().length / cfr.releases.length) * 100)
+      ).toBe(14)
+      expect(cfr.getLog()[0].kind).toBe('failed-release')
+      expect(cfr.getLog()[0].bugs).toHaveLength(2)
+    })
+  })
+
   it('calculate 0% failures on 1 issues on 1 release when more than a month ago', () => {
     const bugs = [bug('2023-04-30T17:50:53Z', DORA)]
     const releases = [release('2023-04-30T16:50:53Z', DORA)]

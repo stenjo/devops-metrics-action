@@ -120,6 +120,10 @@ last month. By counting the bugs (GitHub issues tagged with the `bug-label`
 label, default `bug`) between releases the last month and average this, we get
 the failures over releases rate. Number in range 0 - 100 (%)
 
+`change-failure-rate-log` - a JSON array of the releases counted as failed,
+each with the bugs opened before the next release, if `logging` is enabled.
+See [Log outputs](#log-outputs).
+
 ### `mttr`
 
 Mean time to restore. This metric is calculated based on the time between the
@@ -131,9 +135,9 @@ that all changes to production is done through releases. Number in hours
 
 ### Log outputs
 
-With `logging: true` the action also emits `deploy-rate-log` and
-`lead-time-log`. Both are **JSON array strings** meant to be parsed with
-`fromJSON` or `jq`, never echoed as free text. Records look like:
+With `logging: true` the action also emits `deploy-rate-log`, `lead-time-log`
+and `change-failure-rate-log`. All are **JSON array strings** meant to be
+parsed with `fromJSON` or `jq`, never echoed as free text. Records look like:
 
 ```json
 [{"kind": "release", "at": "2026-10-01T12:00:00Z", "name": "v1.4.1"}]
@@ -153,6 +157,28 @@ With `logging: true` the action also emits `deploy-rate-log` and
   }
 ]
 ```
+
+```json
+[
+  {
+    "kind": "failed-release",
+    "at": "2026-10-01T12:00:00Z",
+    "name": "v1.4.1",
+    "bugs": [
+      {
+        "number": 42,
+        "title": "bug: crash on start",
+        "createdAt": "2026-10-02T08:15:00Z"
+      }
+    ]
+  }
+]
+```
+
+A `failed-release` record is one release interval counted as failed: the
+release that was deployed and the `bug-label` issues opened before the next
+release (or before now, for the latest release). The number of records equals
+the failed-deploy count used in the rate.
 
 The logs are safe by construction:
 
@@ -186,6 +212,17 @@ Use `fromJSON` to work with the records in expressions, or `jq` in a script:
       echo '| --- | --- | --- | --- |'
       jq -r '.[] | select(.kind == "pull")
         | "| \(.at) | \(.title) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
+    } >> "$GITHUB_STEP_SUMMARY"
+
+- name: Failed releases behind the change failure rate
+  env:
+    CFR_LOG: ${{ steps.dora.outputs.change-failure-rate-log }}
+  run: |
+    {
+      echo '| Published | Release | Bugs opened before next release |'
+      echo '| --- | --- | --- |'
+      jq -r '.[] | select(.kind == "failed-release")
+        | "| \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title)"] | join("<br>")) |"' <<< "$CFR_LOG"
     } >> "$GITHUB_STEP_SUMMARY"
 ```
 

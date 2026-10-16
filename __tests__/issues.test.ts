@@ -30,6 +30,8 @@ describe('mocked Issues API should', () => {
     expect(il?.length).toBe(30)
     expect(il?.[0]).toEqual({
       repo: 'stenjo/devops-metrics-action',
+      number: 33,
+      title: 'chore(main): release 0.3.1-beta',
       createdAt: +new Date('2023-04-30T17:28:48Z'),
       closedAt: +new Date('2023-04-30T17:29:33Z'),
       labels: ['autorelease: tagged']

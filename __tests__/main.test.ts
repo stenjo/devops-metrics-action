@@ -536,6 +536,14 @@ describe('run', () => {
       }
     ])
     ;(ChangeFailureRate.prototype.Cfr as Mock).mockReturnValue(0.1)
+    ;(ChangeFailureRate.prototype.getLog as Mock).mockReturnValue([
+      {
+        kind: 'failed-release',
+        at: '2023-04-12T22:33:24Z',
+        name: 'v0.0.1',
+        bugs: [{number: 3, title: 'bug: x', createdAt: '2023-04-13T00:00:00Z'}]
+      }
+    ])
     ;(MeanTimeToRestore.prototype.mttr as Mock).mockReturnValue(3)
   })
 
@@ -593,12 +601,18 @@ describe('run', () => {
         '"commitAt":"2023-04-20T00:00:00Z","commitMessage":"first",' +
         '"releaseAt":"2023-04-30T17:50:53Z","release":"v1.0.0","leadTimeDays":10.74}]',
       'change-failure-rate': 0.1,
+      'change-failure-rate-log':
+        '[{"kind":"failed-release","at":"2023-04-12T22:33:24Z","name":"v0.0.1",' +
+        '"bugs":[{"number":3,"title":"bug: x","createdAt":"2023-04-13T00:00:00Z"}]}]',
       mttr: 3
     }
     expect(outputs).toEqual(expected)
     expect(fake.setOutput.mock.calls).toEqual(Object.entries(expected))
     expect(JSON.parse(outputs['deploy-rate-log'] as string)).toHaveLength(2)
     expect(JSON.parse(outputs['lead-time-log'] as string)).toHaveLength(1)
+    expect(
+      JSON.parse(outputs['change-failure-rate-log'] as string)
+    ).toHaveLength(1)
   })
 
   it('does not set log outputs when logging is disabled', async () => {

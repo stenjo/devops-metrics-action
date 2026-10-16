@@ -58,6 +58,7 @@ jobs:
         env:
           DEPLOY_RATE_LOG: ${{ steps.dora.outputs.deploy-rate-log }}
           LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
+          CFR_LOG: ${{ steps.dora.outputs.change-failure-rate-log }}
         run: |
           if ! jq -e 'type == "array"' <<< "$LEAD_TIME_LOG" > /dev/null 2>&1; then
             echo "Log outputs are not JSON yet (action older than v2); skipping summary"
@@ -77,6 +78,18 @@ jobs:
             jq -r '.[] | select(.kind == "pull") | "| \(.at) | \(.title | gsub("\\|"; "\\|")) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
             jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$LEAD_TIME_LOG"
           } >> "$GITHUB_STEP_SUMMARY"
+          # Absent until the action pin includes the change-failure-rate-log output.
+          if jq -e 'type == "array"' <<< "$CFR_LOG" > /dev/null 2>&1; then
+            {
+              echo
+              echo '## Releases behind the change failure rate'
+              echo
+              echo '| Published | Release | Bugs opened before next release |'
+              echo '| --- | --- | --- |'
+              jq -r '.[] | select(.kind == "failed-release") | "| \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title | gsub("\\|"; "\\|"))"] | join("<br>")) |"' <<< "$CFR_LOG"
+              jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$CFR_LOG"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # Store Deploy Rate history
       - name: Load deploy rate history

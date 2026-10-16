@@ -25,6 +25,7 @@ export interface Outputs {
   'lead-time': number
   'lead-time-log'?: string
   'change-failure-rate': number
+  'change-failure-rate-log'?: string
   mttr: number
 }
 
@@ -198,6 +199,7 @@ export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
     'lead-time': leadTime,
     ...(logging && {'lead-time-log': serializeLog(lt.getLog())}),
     'change-failure-rate': cfr.Cfr(),
+    ...(logging && {'change-failure-rate-log': serializeLog(cfr.getLog())}),
     mttr: mttr.mttr()
   }
   for (const [name, value] of Object.entries(outputs)) {
