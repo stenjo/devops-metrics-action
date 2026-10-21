@@ -39353,9 +39353,6 @@ class DeployFrequency {
         return this.log;
     }
     constructor(releases, options) {
-        if (releases === null || releases.length === 0) {
-            throw new Error('Empty release list');
-        }
         this.rList = releases;
         this.window = options.window;
     }
@@ -39509,9 +39506,6 @@ class MeanTimeToRestore {
         this.window = options.window;
         this.issues = issues;
         this.bugLabel = options.bugLabel ?? 'bug';
-        if (releases === null || releases.length === 0) {
-            throw new Error('Empty release list');
-        }
         this.releases = [...releases].sort((a, b) => a.publishedAt - b.publishedAt);
     }
     getBugCount() {
@@ -39833,6 +39827,32 @@ function parseFlag(core, name) {
     }
     return false;
 }
+function noDataReason(metric, releases, pulls) {
+    if (releases.length === 0) {
+        return 'no releases in the window';
+    }
+    if (metric === 'lead-time' && pulls.length === 0) {
+        return 'no pull requests in the window';
+    }
+    return undefined;
+}
+// Reports which metrics have data to compute from, warning once per metric that has none.
+function metricsStatus(releases, pulls, core) {
+    const check = (metric) => {
+        const reason = noDataReason(metric, releases, pulls);
+        if (reason === undefined) {
+            return 'computed';
+        }
+        core.warning(`${metric} defaulted to 0: ${reason}`);
+        return 'no-data';
+    };
+    return {
+        'deploy-rate': check('deploy-rate'),
+        'lead-time': check('lead-time'),
+        'change-failure-rate': check('change-failure-rate'),
+        mttr: check('mttr')
+    };
+}
 function parseInputs(core, context, env) {
     let repo = core.getInput('repo');
     if (repo === '' || repo === null) {
@@ -39889,6 +39909,7 @@ async function run({ inputs, client, core }) {
     const releaseList = await new ReleaseAdapter(client, owner, repositories, window).GetAllReleasesLastMonth();
     const pulls = await new PullRequestsAdapter(client, owner, repositories, window).GetAllPRsLastMonth();
     const issueList = await new IssuesAdapter(client, owner, repositories, window).GetAllIssuesLastMonth();
+    const status = metricsStatus(releaseList, pulls, core);
     const df = new DeployFrequency(releaseList, { window });
     const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client), {
         window,
@@ -39905,7 +39926,8 @@ async function run({ inputs, client, core }) {
         'change-failure-rate': cfr.Cfr(),
         ...(logging && { 'change-failure-rate-log': serializeLog(cfr.getLog()) }),
         mttr: mttr.mttr(),
-        ...(logging && { 'mttr-log': serializeLog(mttr.getLog()) })
+        ...(logging && { 'mttr-log': serializeLog(mttr.getLog()) }),
+        'metrics-status': JSON.stringify(status)
     };
     for (const [name, value] of Object.entries(outputs)) {
         core.setOutput(name, value);

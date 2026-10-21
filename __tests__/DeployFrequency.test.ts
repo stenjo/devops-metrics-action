@@ -82,23 +82,15 @@ describe('Deploy frequency should', () => {
 
     expect(rr).toBe('0.00')
   })
-  it('throw exception when no releases', () => {
-    const emptyReleaseList: Release[] = []
+  it('reports a zero rate and an empty log when there are no releases', () => {
+    const df = new DeployFrequency([], {
+      window: windowAt('2023-05-14T22:33:11Z')
+    })
 
-    const t = (): void => {
-      new DeployFrequency(emptyReleaseList)
-    }
-
-    expect(t).toThrow('Empty release list')
-  })
-  it('throw exception when release list is null', () => {
-    const emptyReleaseList: Release[] | null = null
-
-    const t = (): void => {
-      new DeployFrequency(emptyReleaseList)
-    }
-
-    expect(t).toThrow('Empty release list')
+    expect(df.rate()).toBe('0.00')
+    expect(df.weekly()).toBe(0)
+    expect(df.monthly()).toBe(0)
+    expect(df.getLog()).toEqual([])
   })
   it('get an empty log of releases', () => {
     const df = new DeployFrequency(releaseList7, {

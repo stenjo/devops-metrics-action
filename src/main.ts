@@ -10,6 +10,8 @@ import {CommitsAdapter} from './CommitsAdapter'
 import {LeadTime} from './LeadTime'
 import {serializeLog} from './log'
 import {metricsWindow} from './MetricsWindow'
+import type {Release} from './types/Release'
+import type {PullRequest} from './types/PullRequest'
 
 export interface Inputs {
   owner: string
@@ -20,6 +22,14 @@ export interface Inputs {
   bugLabel: string
 }
 
+export type MetricName =
+  'deploy-rate' | 'lead-time' | 'change-failure-rate' | 'mttr'
+
+// 'no-data' means the metric was defaulted to 0 because there was nothing to compute from.
+export type MetricStatus = 'computed' | 'no-data'
+
+export type MetricsStatus = Record<MetricName, MetricStatus>
+
 export interface Outputs {
   'deploy-rate': string
   'deploy-rate-log'?: string
@@ -29,6 +39,7 @@ export interface Outputs {
   'change-failure-rate-log'?: string
   mttr: number
   'mttr-log'?: string
+  'metrics-status': string
 }
 
 export type ActionsCore = Pick<
@@ -120,6 +131,42 @@ export interface RunDeps {
   core: Pick<ActionsCore, 'info' | 'warning' | 'setOutput'>
 }
 
+function noDataReason(
+  metric: MetricName,
+  releases: Release[],
+  pulls: PullRequest[]
+): string | undefined {
+  if (releases.length === 0) {
+    return 'no releases in the window'
+  }
+  if (metric === 'lead-time' && pulls.length === 0) {
+    return 'no pull requests in the window'
+  }
+  return undefined
+}
+
+// Reports which metrics have data to compute from, warning once per metric that has none.
+export function metricsStatus(
+  releases: Release[],
+  pulls: PullRequest[],
+  core: Pick<ActionsCore, 'warning'>
+): MetricsStatus {
+  const check = (metric: MetricName): MetricStatus => {
+    const reason = noDataReason(metric, releases, pulls)
+    if (reason === undefined) {
+      return 'computed'
+    }
+    core.warning(`${metric} defaulted to 0: ${reason}`)
+    return 'no-data'
+  }
+  return {
+    'deploy-rate': check('deploy-rate'),
+    'lead-time': check('lead-time'),
+    'change-failure-rate': check('change-failure-rate'),
+    mttr: check('mttr')
+  }
+}
+
 export function parseInputs(
   core: Pick<ActionsCore, 'getInput' | 'info' | 'warning' | 'setSecret'>,
   context: ActionsContext,
@@ -206,6 +253,8 @@ export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
     window
   ).GetAllIssuesLastMonth()
 
+  const status = metricsStatus(releaseList, pulls, core)
+
   const df = new DeployFrequency(releaseList, {window})
   const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client), {
     window,
@@ -223,7 +272,8 @@ export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
     'change-failure-rate': cfr.Cfr(),
     ...(logging && {'change-failure-rate-log': serializeLog(cfr.getLog())}),
     mttr: mttr.mttr(),
-    ...(logging && {'mttr-log': serializeLog(mttr.getLog())})
+    ...(logging && {'mttr-log': serializeLog(mttr.getLog())}),
+    'metrics-status': JSON.stringify(status)
   }
   for (const [name, value] of Object.entries(outputs)) {
     core.setOutput(name, value)

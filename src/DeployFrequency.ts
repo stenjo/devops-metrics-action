@@ -16,10 +16,7 @@ export class DeployFrequency {
     return this.log
   }
 
-  constructor(releases: Release[] | null, options: MetricOptions) {
-    if (releases === null || releases.length === 0) {
-      throw new Error('Empty release list')
-    }
+  constructor(releases: Release[], options: MetricOptions) {
     this.rList = releases
     this.window = options.window
   }

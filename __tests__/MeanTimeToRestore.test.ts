@@ -235,13 +235,13 @@ describe('MeanTimeToRestore should', () => {
     expect(meanTime).toBe(4)
   })
 
-  it('throw error when empty release list', () => {
-    const m = (): void => {
-      new MeanTimeToRestore([] as Issue[], [] as Release[], {
-        window: windowAt()
-      })
-    }
-    expect(m).toThrow('Empty release list')
+  it('returns 0 when both the issue and release lists are empty', () => {
+    const m = new MeanTimeToRestore([] as Issue[], [] as Release[], {
+      window: windowAt()
+    })
+
+    expect(m.mttr()).toBe(0)
+    expect(m.getLog()).toEqual([])
   })
 
   it('get mttr for bug 1 when release in wrong repo after bug 2', () => {
@@ -369,14 +369,16 @@ describe('MeanTimeToRestore should', () => {
     expect(avMttr).toBeLessThan(7.9)
   })
 
-  it('throw excepiton when no releases', () => {
+  it('returns 0 when there are bugs but no releases', () => {
     const emptyReleaseList: Release[] = []
 
-    const t = (): void => {
-      new MeanTimeToRestore(issues, emptyReleaseList, {window: windowAt()})
-    }
+    const m = new MeanTimeToRestore(issues, emptyReleaseList, {
+      window: windowAt()
+    })
 
-    expect(t).toThrow('Empty release list')
+    expect(m.getBugCount()).toEqual([])
+    expect(m.mttr()).toBe(0)
+    expect(m.getLog()).toEqual([])
   })
 
   it('return 0 when no bugs', () => {
@@ -388,16 +390,6 @@ describe('MeanTimeToRestore should', () => {
     const meanTime = mttrEmpty.mttr()
 
     expect(meanTime).toBe(0)
-  })
-
-  it('throw exception when release list is null', () => {
-    const t = (): void => {
-      new MeanTimeToRestore(issues, null as unknown as Release[], {
-        window: windowAt()
-      })
-    }
-
-    expect(t).toThrow('Empty release list')
   })
 
   it('not mutate the release list passed in', () => {
