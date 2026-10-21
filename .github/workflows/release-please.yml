@@ -4,8 +4,7 @@ on:
       - main
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 name: release-please
 
@@ -13,10 +12,19 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      # PRs opened with GITHUB_TOKEN are authored by github-actions[bot], which GitHub
+      # treats as an outside contributor, so every PR workflow sits in "awaiting approval".
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+
       - uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4
         id: release
         with:
           release-type: simple
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -25,7 +33,7 @@ jobs:
       - name: tag major and minor versions
         if: ${{ steps.release.outputs.release_created }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           MAJOR: ${{ steps.release.outputs.major }}
           MINOR: ${{ steps.release.outputs.minor }}
         run: |
