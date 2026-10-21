@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/stenjo/devops-metrics-action/compare/v2.1.0...v2.1.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **metrics:** return empty results instead of throwing on empty release lists ([#493](https://github.com/stenjo/devops-metrics-action/issues/493)) ([d13c665](https://github.com/stenjo/devops-metrics-action/commit/d13c665baf9a1fd1b2eef67e994c5bec545d461d)), closes [#461](https://github.com/stenjo/devops-metrics-action/issues/461)
+
 ## [2.1.0](https://github.com/stenjo/devops-metrics-action/compare/v2.0.0...v2.1.0) (2026-10-16)
 
 
