@@ -102,5 +102,57 @@
       { "priority": "low", "category": "information_disclosure_error_handling", "action": "Wrap adapter errors with a fixed message + status instead of forwarding e.message.", "reason": "Predictable, minimal logs.", "tracked_by": [454] },
       { "priority": "low", "category": "secrets_secure_configuration", "action": "Keep SHA-pinned actions, persist-credentials:false, check-dist, Dependabot, CodeQL, dependency overrides; add permissions: contents: read to README example.", "reason": "Supply chain already strong; nudge consumers to least privilege.", "tracked_by": [464] }
     ]
+  },
+  {
+    "date": "2026-10-21",
+    "commit": "d13c665",
+    "branch": "main",
+    "scope": "Production code (src/, action.yml, package.json) and production-relevant workflows. Tests, CI helpers and local tooling excluded.",
+    "method": "Manual code review against 8 fixed categories, whole-number 0-10 per category, overall = sum/80*100.",
+    "baseline": { "date": "2026-10-15", "commit": "a6ca971", "overall_score": 56 },
+    "tracking_issues": [452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464],
+    "tracking_issues_closed": [452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464],
+    "category_scores": {
+      "authorization_access_control": 8,
+      "authentication_token_validation": 8,
+      "input_validation_boundary_hardening": 8,
+      "injection_safety_query_construction": 9,
+      "data_integrity_atomicity_auditability": 8,
+      "information_disclosure_error_handling": 8,
+      "abuse_prevention_rate_limiting_operational_safety": 7,
+      "secrets_secure_configuration": 8
+    },
+    "overall_score": 80,
+    "structural_metrics": {
+      "new_octokit_in_src": 1,
+      "new_date_in_src": 1,
+      "set_failed_files": ["src/index.ts"],
+      "npm_audit_production_vulnerabilities": 0
+    },
+    "category_notes": {
+      "authorization_access_control": "Action is read-only by construction; README usage example carries a contents/pull-requests/issues: read block and GITHUB_TOKEN vs fine-grained PAT guidance; dora.yaml reference consumer runs the action with a read-only token and confines contents: write to the history job. Residual: the action cannot verify the scope of the token it is handed.",
+      "authentication_token_validation": "parseInputs fails fast when neither the token input nor GH_TOKEN is set, registers the token with core.setSecret, and action.yml defaults token to github.token; 401 is not retried. Residual: no pre-flight token check, a bad token surfaces as a GitHubApiError (status 401) on the first request.",
+      "input_validation_boundary_hardening": "owner/repo validated against an anchored name regex (1-100 chars, no '..'), owner/name entries must agree with the owner input, at most 25 repositories, bug-label trimmed and bounded to 50 chars, flags accept only the literal 'true'. API payloads cross an anti-corruption layer (src/github/mappers.ts) before reaching metrics. Residual: payload shapes are trusted structurally (TypeScript only, no runtime schema).",
+      "injection_safety_query_construction": "Every request is a 'METHOD /route' template with Octokit params (URL-encoded); GitHubClient.request refuses anything else so a response-supplied URL can never carry the token; commits are fetched by owner/repo/number. All *-log outputs are sanitized (control chars, backticks, ${ and $( openers removed; 200-char cap) and bounded (500 records / <1 MiB) JSON arrays; metrics-status and the four metric outputs are numeric or action-built. Residual: a consumer can still interpolate outputs into run:, which the README explicitly warns against with an env-var pattern.",
+      "data_integrity_atomicity_auditability": "Outputs are set only after all three listings succeeded, so a failed run leaves no partial outputs; releases/issues are matched by exact lower-cased owner/repo key; one MetricsWindow is shared by every adapter and metric; empty data yields 0 plus a warning and a metrics-status record instead of a throw. Residual: results truncated by the 99-page cap are only signalled by a warning, not reflected in metrics-status.",
+      "information_disclosure_error_handling": "Adapter failures are wrapped in GitHubApiError with a stable, URL/body-free message (status + route template); only index.ts calls setFailed, and the raw Octokit message goes to core.error where the token is already masked. Log text is sanitized before it reaches an output. Residual: validation errors echo the offending input value (authored by the workflow owner, so low risk).",
+      "abuse_prevention_rate_limiting_operational_safety": "Octokit throttling + retry plugins (primary limit waited out once, secondary limit never retried, 5xx/network retried with backoff); bounds on repositories (25), pages per listing (99), commit fetches (200 at concurrency 4); pagination stops at the window edge so a typical run costs tens of requests; remaining rate limit logged. Residual: no total request or time budget, and onRateLimit may sleep until the reset (up to ~1 h) before giving up.",
+      "secrets_secure_configuration": "Token masked via setSecret, token defaults to github.token, workflows SHA-pinned with persist-credentials: false, check-dist verifies the bundle, Dependabot (actions + npm, 7-day cooldown), CodeQL, qs/undici overrides, npm audit --omit=dev clean. Residual: badges.yaml and stryker.yaml still grant contents: write at workflow level; the unused 'octokit' meta-package is still a production dependency; package.json metadata is still the template's."
+    },
+    "critical_issues": [],
+    "resolved_since_baseline": [
+      { "title": "Untrusted PR titles and commit messages are emitted verbatim in step outputs", "resolved_by": [455, 453], "evidence": "src/sanitize.ts + src/log.ts; *-log outputs are sanitized, bounded JSON arrays (v2.0.0)." },
+      { "title": "Silent fallback to unauthenticated GitHub API when no token is supplied", "resolved_by": [456], "evidence": "src/main.ts parseInputs throws TOKEN_REQUIRED_MESSAGE; action.yml token default github.token." },
+      { "title": "Token from GH_TOKEN env fallback is never registered with core.setSecret", "resolved_by": [456], "evidence": "src/main.ts: core.setSecret(token) after resolution." },
+      { "title": "API-supplied commits_url is fetched with the bearer token and no host allowlist", "resolved_by": [457], "evidence": "src/CommitsAdapter.ts builds GET /repos/{owner}/{repo}/pulls/{pull_number}/commits; GitHubClient.request rejects non-route URLs." },
+      { "title": "No throttling, retry, or workload bounds on GitHub API usage", "resolved_by": [458, 459], "evidence": "src/GitHubClient.ts plugins + limits; maxRepositories(); defaultLeadTimeLimits(); window-based pagination stop." },
+      { "title": "Inputs owner, repo and bug-label are not validated beyond non-empty", "resolved_by": [462], "evidence": "src/main.ts validateName / parseRepoEntry / parseBugLabel." }
+    ],
+    "recommendations": [
+      { "priority": "low", "category": "data_integrity_atomicity_auditability", "action": "Reflect a hit page cap in metrics-status (e.g. \"partial\") instead of only a warning.", "reason": "Consumers can currently not tell a complete 0 from a truncated listing without reading the log.", "tracked_by": [] },
+      { "priority": "low", "category": "abuse_prevention_rate_limiting_operational_safety", "action": "Cap the primary-rate-limit wait (or fail fast with a clear message) and consider an overall request budget per run.", "reason": "A single retry may stall the job until the hourly reset.", "tracked_by": [] },
+      { "priority": "low", "category": "secrets_secure_configuration", "action": "Apply the dora.yaml job split (read-only workflow permissions, contents: write on the push job only) to badges.yaml and stryker.yaml.", "reason": "Same least-privilege pattern, already proven green.", "tracked_by": [] },
+      { "priority": "low", "category": "secrets_secure_configuration", "action": "Drop the unused 'octokit' meta-package from dependencies and replace the template metadata in package.json.", "reason": "Smaller dependency surface and accurate provenance.", "tracked_by": [] }
+    ]
   }
 ]
