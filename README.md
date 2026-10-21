@@ -130,6 +130,13 @@ The action fetches a further 30 days of history before `from` so that `mttr`
 and `change-failure-rate` can find the release that preceded a bug opened early
 in the window.
 
+The four metric outputs are **always numeric**. A repository with no release
+(or no pull request) in the fetched period does not fail the run: the metrics
+that cannot be computed are reported as `0`, one workflow warning is written
+per such metric (`mttr defaulted to 0: no releases in the window`), and
+[`metrics-status`](#metrics-status) records which metrics were defaulted so a
+consumer can tell "0 bugs" from "no data".
+
 ### `deploy-frequency`
 
 Rate of deploys (tagged releases) per week over the 30-day window. Decimal
@@ -170,6 +177,30 @@ decimals)
 `mttr-log` - a JSON array of the bugs the mean is based on, each with the
 release before it was opened and the release after it was closed, if `logging`
 is enabled. See [Log outputs](#log-outputs).
+
+### `metrics-status`
+
+A JSON object (always set) mapping each metric to `"computed"` or `"no-data"`:
+
+```json
+{
+  "deploy-rate": "computed",
+  "lead-time": "no-data",
+  "change-failure-rate": "computed",
+  "mttr": "computed"
+}
+```
+
+`"no-data"` means the metric was defaulted to `0` because there was nothing
+to compute from: no releases in the fetched period (all four metrics), or no
+pull requests (`lead-time` only). A metric with data that legitimately comes
+out at `0` — for example `change-failure-rate` with releases but no bugs — is
+`"computed"`. Read it with `fromJSON`:
+
+```yaml
+- if: fromJSON(steps.dora.outputs.metrics-status).mttr == 'no-data'
+  run: echo "::notice::No releases yet, mttr is not meaningful"
+```
 
 ### Log outputs
 

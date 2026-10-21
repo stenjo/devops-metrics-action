@@ -12,6 +12,7 @@ import {
   parseInputs,
   run,
   maxRepositories,
+  metricsStatus,
   TOKEN_REQUIRED_MESSAGE
 } from '../src/main'
 import type {ActionsContext, Inputs} from '../src/main'
@@ -538,6 +539,8 @@ describe('run', () => {
   const mockReleases = [{}, {}] as Release[]
   const mockPRs = [{}, {}] as PullRequest[]
   const mockIssues = [{}, {}] as Issue[]
+  const ALL_COMPUTED =
+    '{"deploy-rate":"computed","lead-time":"computed","change-failure-rate":"computed","mttr":"computed"}'
 
   afterEach(() => {
     vi.useRealTimers()
@@ -695,7 +698,8 @@ describe('run', () => {
         '"createdAt":"2023-04-13T00:00:00Z","closedAt":"2023-04-14T00:00:00Z",' +
         '"releaseBefore":"v0.0.1","releaseBeforeAt":"2023-04-12T22:33:24Z",' +
         '"releaseAfter":"v0.0.2","releaseAfterAt":"2023-04-22T20:28:29Z",' +
-        '"restoreDays":9.91}]'
+        '"restoreDays":9.91}]',
+      'metrics-status': ALL_COMPUTED
     }
     expect(outputs).toEqual(expected)
     expect(fake.setOutput.mock.calls).toEqual(Object.entries(expected))
@@ -720,19 +724,20 @@ describe('run', () => {
       'deploy-rate': '5',
       'lead-time': 10,
       'change-failure-rate': 0.1,
-      mttr: 3
+      mttr: 3,
+      'metrics-status': ALL_COMPUTED
     }
     expect(outputs).toEqual(expected)
     expect(fake.setOutput.mock.calls).toEqual(Object.entries(expected))
   })
 
-  it('reports an empty issue list instead of computing change-failure-rate and mttr', async () => {
+  it('computes change-failure-rate and mttr from an empty issue list without warning', async () => {
     ;(IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock).mockResolvedValue(
       []
     )
     const fake = fakeCore({})
 
-    await run({inputs: inputsWith(), client, core: fake})
+    const outputs = await run({inputs: inputsWith(), client, core: fake})
 
     expect(ChangeFailureRate).toHaveBeenCalledWith([], mockReleases, {
       window: WINDOW,
@@ -742,6 +747,74 @@ describe('run', () => {
       window: WINDOW,
       bugLabel: 'bug'
     })
+    expect(outputs['metrics-status']).toBe(ALL_COMPUTED)
+    expect(fake.warning).not.toHaveBeenCalled()
+  })
+
+  it('succeeds with zero outputs and one warning per metric when there is no data at all', async () => {
+    ;(
+      ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
+    ).mockResolvedValue([])
+    ;(
+      PullRequestsAdapter.prototype.GetAllPRsLastMonth as Mock
+    ).mockResolvedValue([])
+    ;(IssuesAdapter.prototype.GetAllIssuesLastMonth as Mock).mockResolvedValue(
+      []
+    )
+    ;(DeployFrequency.prototype.rate as Mock).mockReturnValue('0.00')
+    ;(LeadTime.prototype.getLeadTime as Mock).mockResolvedValue(0)
+    ;(ChangeFailureRate.prototype.Cfr as Mock).mockReturnValue(0)
+    ;(MeanTimeToRestore.prototype.mttr as Mock).mockReturnValue(0)
+    const fake = fakeCore({})
+
+    const outputs = await run({inputs: inputsWith(), client, core: fake})
+
+    expect(outputs).toEqual({
+      'deploy-rate': '0.00',
+      'lead-time': 0,
+      'change-failure-rate': 0,
+      mttr: 0,
+      'metrics-status':
+        '{"deploy-rate":"no-data","lead-time":"no-data","change-failure-rate":"no-data","mttr":"no-data"}'
+    })
+    expect(fake.warning.mock.calls).toEqual([
+      ['deploy-rate defaulted to 0: no releases in the window'],
+      ['lead-time defaulted to 0: no releases in the window'],
+      ['change-failure-rate defaulted to 0: no releases in the window'],
+      ['mttr defaulted to 0: no releases in the window']
+    ])
+  })
+
+  it('warns before any output is set', async () => {
+    ;(
+      ReleaseAdapter.prototype.GetAllReleasesLastMonth as Mock
+    ).mockResolvedValue([])
+    const fake = fakeCore({})
+
+    await run({inputs: inputsWith(), client, core: fake})
+
+    expect(fake.warning.mock.invocationCallOrder.at(-1)).toBeLessThan(
+      fake.setOutput.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('marks only lead-time as no-data when there are releases but no pull requests', async () => {
+    ;(
+      PullRequestsAdapter.prototype.GetAllPRsLastMonth as Mock
+    ).mockResolvedValue([])
+    const fake = fakeCore({})
+
+    const outputs = await run({inputs: inputsWith(), client, core: fake})
+
+    expect(JSON.parse(outputs['metrics-status'])).toEqual({
+      'deploy-rate': 'computed',
+      'lead-time': 'no-data',
+      'change-failure-rate': 'computed',
+      mttr: 'computed'
+    })
+    expect(fake.warning).toHaveBeenCalledExactlyOnceWith(
+      'lead-time defaulted to 0: no pull requests in the window'
+    )
   })
 
   /* eslint-disable @typescript-eslint/unbound-method */
@@ -842,5 +915,44 @@ describe('run', () => {
       run({inputs: inputsWith(), client, core: fake})
     ).rejects.toThrow()
     expect(fake.info).not.toHaveBeenCalled()
+  })
+})
+
+describe('metricsStatus', () => {
+  const releases = [{}] as Release[]
+  const pulls = [{}] as PullRequest[]
+
+  it('reports every metric as computed when releases and pulls exist', () => {
+    const fake = fakeCore({})
+
+    expect(metricsStatus(releases, pulls, fake)).toEqual({
+      'deploy-rate': 'computed',
+      'lead-time': 'computed',
+      'change-failure-rate': 'computed',
+      mttr: 'computed'
+    })
+    expect(fake.warning).not.toHaveBeenCalled()
+  })
+
+  it('keys the status object in output order', () => {
+    expect(Object.keys(metricsStatus(releases, pulls, fakeCore({})))).toEqual([
+      'deploy-rate',
+      'lead-time',
+      'change-failure-rate',
+      'mttr'
+    ])
+  })
+
+  it('prefers the missing-releases reason for lead-time when both lists are empty', () => {
+    const fake = fakeCore({})
+
+    metricsStatus([], [], fake)
+
+    expect(fake.warning).toHaveBeenCalledWith(
+      'lead-time defaulted to 0: no releases in the window'
+    )
+    expect(fake.warning).not.toHaveBeenCalledWith(
+      expect.stringContaining('no pull requests')
+    )
   })
 })

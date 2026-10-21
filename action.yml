@@ -67,6 +67,11 @@ outputs:
       restoreDays} records if logging true; sanitized and capped, ends with
       {kind:"truncated", omitted} when cut'
 
+  metrics-status: # which metrics had data to compute from
+    description: 'JSON object mapping deploy-rate, lead-time,
+      change-failure-rate and mttr to "computed" or "no-data"; a "no-data"
+      metric was defaulted to 0 and a warning was written'
+
 runs:
   using: 'node24'
   main: 'dist/index.js'

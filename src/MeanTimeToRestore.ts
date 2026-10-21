@@ -26,9 +26,6 @@ export class MeanTimeToRestore {
     this.window = options.window
     this.issues = issues
     this.bugLabel = options.bugLabel ?? 'bug'
-    if (releases === null || releases.length === 0) {
-      throw new Error('Empty release list')
-    }
     this.releases = [...releases].sort((a, b) => a.publishedAt - b.publishedAt)
   }
 
