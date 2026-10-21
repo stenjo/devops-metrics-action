@@ -8,25 +8,22 @@ on:
     - cron: '30 0 * * *'
   workflow_dispatch:
 
+# The action only reads; the job that commits history gets contents: write.
 permissions:
-  contents: write
+  contents: read
+  pull-requests: read
+  issues: read
 
 jobs:
-  update-metrics:
+  metrics:
     runs-on: ubuntu-latest
     name: Checking the dora metrics
+    outputs:
+      deploy-rate: ${{ steps.dora.outputs.deploy-rate }}
+      lead-time: ${{ steps.dora.outputs.lead-time }}
+      change-failure-rate: ${{ steps.dora.outputs.change-failure-rate }}
+      mttr: ${{ steps.dora.outputs.mttr }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup Node.js
-        id: setup-node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
-        with:
-          node-version-file: .node-version
-          cache: npm
-
       - name: Dora metrics
         uses: stenjo/devops-metrics-action@113a5f73a92b8cd2b69047591eac8d0d9e1806b9 # v2.0.0
         id: dora
@@ -44,12 +41,6 @@ jobs:
           steps.dora.outputs.change-failure-rate }}"
       - name: Get the mean time to restore
         run: echo "The mean time to restore was ${{ steps.dora.outputs.mttr }}"
-
-      - name: Get current date
-        id: date
-        run: |
-          echo "date=$(date +'%m-%d')" >> "$GITHUB_OUTPUT"
-          mkdir tmp
 
       - name: Install jq
         uses: dcarbone/install-jq-action@4fcb5062d7ce9bc4382d1a352d19ba3ba2c317c1 # v4.0.1
@@ -94,6 +85,32 @@ jobs:
             jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$MTTR_LOG"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  update-history:
+    runs-on: ubuntu-latest
+    name: Update DORA metric history
+    needs: metrics
+    # Only this job pushes to main.
+    permissions:
+      contents: write
+    env:
+      DEPLOY_RATE: ${{ needs.metrics.outputs.deploy-rate }}
+      LEAD_TIME: ${{ needs.metrics.outputs.lead-time }}
+      CHANGE_FAILURE_RATE: ${{ needs.metrics.outputs.change-failure-rate }}
+      MTTR: ${{ needs.metrics.outputs.mttr }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get current date
+        id: date
+        run: |
+          echo "date=$(date +'%m-%d')" >> "$GITHUB_OUTPUT"
+          mkdir tmp
+
+      - name: Install jq
+        uses: dcarbone/install-jq-action@4fcb5062d7ce9bc4382d1a352d19ba3ba2c317c1 # v4.0.1
+
       # Store Deploy Rate history
       - name: Load deploy rate history
         run: |
@@ -102,7 +119,7 @@ jobs:
       - name: Update deploy rate history
         run: |
           DATE="${{ steps.date.outputs.date }}"
-          RATE="${{ steps.dora.outputs.deploy-rate }}"
+          RATE="$DEPLOY_RATE"
           if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/deploy-rate.json > /dev/null 2>&1; then
             jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/deploy-rate.json > data/deploy-rate.json
           else
@@ -117,7 +134,7 @@ jobs:
       - name: Update lead time history
         run: |
           DATE="${{ steps.date.outputs.date }}"
-          RATE="${{ steps.dora.outputs.lead-time }}"
+          RATE="$LEAD_TIME"
           if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/lead-time.json > /dev/null 2>&1; then
             jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/lead-time.json > data/lead-time.json
           else
@@ -132,7 +149,7 @@ jobs:
       - name: Update change failure rate history
         run: |
           DATE="${{ steps.date.outputs.date }}"
-          RATE="${{ steps.dora.outputs.change-failure-rate }}"
+          RATE="$CHANGE_FAILURE_RATE"
           if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/change-failure-rate.json > /dev/null 2>&1; then
             jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/change-failure-rate.json > data/change-failure-rate.json
           else
@@ -147,7 +164,7 @@ jobs:
       - name: Update MTTR history
         run: |
           DATE="${{ steps.date.outputs.date }}"
-          RATE="${{ steps.dora.outputs.mttr }}"
+          RATE="$MTTR"
           if jq -e "[.[]| select(.date == \"$DATE\")] | length > 0" tmp/mttr.json > /dev/null 2>&1; then
             jq "(.[] | select(.date == \"$DATE\") ).rate |= \"$RATE\"" tmp/mttr.json > data/mttr.json
           else
