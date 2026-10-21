@@ -80,7 +80,7 @@ jobs:
             git commit -m "Update coverage badge and summary [skip ci]"
             # Other badge workflows push to main concurrently; rebase and retry.
             for i in 1 2 3; do
-              git pull --rebase origin main && git push && exit 0
+              git pull --rebase --autostash origin main && git push && exit 0
               echo "Push attempt $i failed, retrying..."
               sleep 5
             done
