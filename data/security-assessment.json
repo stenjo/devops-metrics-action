@@ -149,10 +149,10 @@
       { "title": "Inputs owner, repo and bug-label are not validated beyond non-empty", "resolved_by": [462], "evidence": "src/main.ts validateName / parseRepoEntry / parseBugLabel." }
     ],
     "recommendations": [
-      { "priority": "low", "category": "data_integrity_atomicity_auditability", "action": "Reflect a hit page cap in metrics-status (e.g. \"partial\") instead of only a warning.", "reason": "Consumers can currently not tell a complete 0 from a truncated listing without reading the log.", "tracked_by": [] },
-      { "priority": "low", "category": "abuse_prevention_rate_limiting_operational_safety", "action": "Cap the primary-rate-limit wait (or fail fast with a clear message) and consider an overall request budget per run.", "reason": "A single retry may stall the job until the hourly reset.", "tracked_by": [] },
-      { "priority": "low", "category": "secrets_secure_configuration", "action": "Apply the dora.yaml job split (read-only workflow permissions, contents: write on the push job only) to badges.yaml and stryker.yaml.", "reason": "Same least-privilege pattern, already proven green.", "tracked_by": [] },
-      { "priority": "low", "category": "secrets_secure_configuration", "action": "Drop the unused 'octokit' meta-package from dependencies and replace the template metadata in package.json.", "reason": "Smaller dependency surface and accurate provenance.", "tracked_by": [] }
+      { "priority": "low", "category": "data_integrity_atomicity_auditability", "action": "Reflect a hit page cap in metrics-status (e.g. \"partial\") instead of only a warning.", "reason": "Consumers can currently not tell a complete 0 from a truncated listing without reading the log.", "tracked_by": [496] },
+      { "priority": "low", "category": "abuse_prevention_rate_limiting_operational_safety", "action": "Cap the primary-rate-limit wait (or fail fast with a clear message) and consider an overall request budget per run.", "reason": "A single retry may stall the job until the hourly reset.", "tracked_by": [497] },
+      { "priority": "low", "category": "secrets_secure_configuration", "action": "Apply the dora.yaml job split (read-only workflow permissions, contents: write on the push job only) to badges.yaml and stryker.yaml.", "reason": "Same least-privilege pattern, already proven green.", "tracked_by": [498] },
+      { "priority": "low", "category": "secrets_secure_configuration", "action": "Drop the unused 'octokit' meta-package from dependencies and replace the template metadata in package.json.", "reason": "Smaller dependency surface and accurate provenance.", "tracked_by": [499] }
     ]
   }
 ]
