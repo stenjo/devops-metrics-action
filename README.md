@@ -63,8 +63,24 @@ then the `GH_TOKEN` environment variable. The action fails fast if neither
 yields a token, rather than silently running unauthenticated. The resolved
 token is registered with the runner as a secret so it is masked in logs.
 
-To read metrics from other repositories than the one running the workflow,
-pass a token with read access to those repositories:
+The action only **reads** releases, commits, pull requests and issues; it
+never writes to GitHub. For the repository running the workflow,
+`${{ github.token }}` with this read-only `permissions:` block is sufficient
+(see [Usage](#usage)):
+
+```yaml
+permissions:
+  contents: read # releases, commits
+  pull-requests: read # pull requests
+  issues: read # issues (for mttr / change-failure-rate)
+```
+
+`GITHUB_TOKEN` is scoped to the current repository and cannot read other
+**private** repositories. To read metrics from other repositories, pass a
+[fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token)
+that is granted read-only **Contents**, **Pull requests** and **Issues**
+(and, for private repositories, **Metadata**) on exactly the target
+repositories, and store it as a repository secret:
 
 ```yaml
 token: ${{ secrets.METRICS_PAT }}
@@ -331,20 +347,30 @@ on:
   schedule:
     - cron: '30 0 * * *'
 
+# The action is read-only; grant nothing more.
+permissions:
+  contents: read # releases, commits
+  pull-requests: read # pull requests
+  issues: read # issues (for mttr / change-failure-rate)
+
 jobs:
   update-metrics:
     runs-on: ubuntu-latest
     name: Checking the dora metrics
     steps:
       - name: DevOps Metrics from GitHub
-        uses: stenjo/devops-metrics-action@v1
+        uses: stenjo/devops-metrics-action@v2
         id: dora
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 This will base calculations on the repository where the
-workflow is installed and run 12:30 AM every day. To
+workflow is installed and run 12:30 AM every day. The `token` input defaults
+to `${{ github.token }}`, and the explicit `permissions:` block keeps that
+token read-only instead of inheriting the repository default (often `write`).
+If a later step needs more — for example `contents: write` to commit metric
+history — grant it to that job only, as
+[.github/workflows/dora.yaml](https://github.com/stenjo/devops-metrics-action/blob/main/.github/workflows/dora.yaml)
+does. To
 access the outputs anywhere in the workflow, refer to the
 output of the calculation step via variable format
 `${{ steps.dora.outputs.deploy-rate }}`. Something like:
