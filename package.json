@@ -1,17 +1,17 @@
 {
-  "name": "typescript-action",
-  "description": "GitHub Actions TypeScript template",
+  "name": "devops-metrics-action",
+  "description": "Outputs a set of key metrics based on GitHub issues and releases",
   "version": "0.0.0",
   "type": "module",
-  "author": "",
+  "author": "Sten Otto Johnsen",
   "private": true,
-  "homepage": "https://github.com/actions/typescript-action",
+  "homepage": "https://github.com/stenjo/devops-metrics-action",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/typescript-action.git"
+    "url": "git+https://github.com/stenjo/devops-metrics-action.git"
   },
   "bugs": {
-    "url": "https://github.com/actions/typescript-action/issues"
+    "url": "https://github.com/stenjo/devops-metrics-action/issues"
   },
   "keywords": [
     "actions",
@@ -43,8 +43,7 @@
     "@actions/github": "^9.1.1",
     "@octokit/core": "^7.0.8",
     "@octokit/plugin-retry": "^8.1.1",
-    "@octokit/plugin-throttling": "^11.0.5",
-    "octokit": "^5.0.5"
+    "@octokit/plugin-throttling": "^11.0.5"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^10.0.0",
