@@ -365,8 +365,7 @@ describe('MeanTimeToRestore should', () => {
   it('get average time to repair', () => {
     const avMttr: number = mttr.mttr()
 
-    expect(avMttr).toBeGreaterThan(6.4)
-    expect(avMttr).toBeLessThan(7.9)
+    expect(avMttr).toBe(7.11)
   })
 
   it('returns 0 when there are bugs but no releases', () => {
