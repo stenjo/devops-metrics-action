@@ -47,14 +47,16 @@ outputs:
     description: 'Mean time to restore (days)'
 
   deploy-rate-log: # list of releases that forms the basis of the deployment rate
-    description: 'JSON array of {kind:"release", repo, at, name} records if
-      logging true; sanitized and capped, ends with {kind:"truncated", omitted}
-      when cut'
+    description: 'JSON array of release records ({kind:"release", repo, at,
+      name}) when logging is true; sanitized and capped at 500 records/~1 MiB,
+      ends with
+      {kind:"truncated", omitted} when cut'
 
   lead-time-log: # list of pull requests that forms the basis of the lead-time
-    description: 'JSON array of {kind:"pull", repo, at, title, commitAt,
-      commitMessage, releaseAt, release, leadTimeDays} records if logging true;
-      sanitized and capped, ends with {kind:"truncated", omitted} when cut'
+    description: 'JSON array of pull request records ({kind:"pull", repo, at,
+      title, commitAt, commitMessage, releaseAt, release, leadTimeDays}) when
+      logging is true; sanitized and capped at 500 records/~1 MiB, ends with
+      {kind:"truncated", omitted} when cut'
 
   change-failure-rate-log: # list of failed releases and the bugs opened after them
     description: 'JSON array of {kind:"failed-release", repo, at, name,
