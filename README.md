@@ -187,7 +187,8 @@ is enabled. This log was added in
 
 ### `metrics-status`
 
-A JSON object (always set) mapping each metric to `"computed"` or `"no-data"`:
+A JSON object (always set) mapping each metric to `"computed"`, `"no-data"` or
+`"partial"`:
 
 ```json
 {
@@ -202,7 +203,10 @@ A JSON object (always set) mapping each metric to `"computed"` or `"no-data"`:
 to compute from: no releases in the fetched period (all four metrics), or no
 pull requests (`lead-time` only). A metric with data that legitimately comes
 out at `0` — for example `change-failure-rate` with releases but no bugs — is
-`"computed"`. Read it with `fromJSON`:
+`"computed"`. `"partial"` means a listing used by the metric reached the
+pagination page cap: releases affect all four metrics, pull requests affect
+`lead-time`, and issues affect `change-failure-rate` and `mttr`. Read it with
+`fromJSON`:
 
 ```yaml
 - if: fromJSON(steps.dora.outputs.metrics-status).mttr == 'no-data'

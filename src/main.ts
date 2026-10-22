@@ -26,9 +26,19 @@ export type MetricName =
   'deploy-rate' | 'lead-time' | 'change-failure-rate' | 'mttr'
 
 // 'no-data' means the metric was defaulted to 0 because there was nothing to compute from.
-export type MetricStatus = 'computed' | 'no-data'
+export type MetricStatus = 'computed' | 'no-data' | 'partial'
 
 export type MetricsStatus = Record<MetricName, MetricStatus>
+
+interface PartialListings {
+  releases: boolean
+  pulls: boolean
+  issues: boolean
+}
+
+const RELEASES_ROUTE = 'GET /repos/{owner}/{repo}/releases'
+const PULLS_ROUTE = 'GET /repos/{owner}/{repo}/pulls'
+const ISSUES_ROUTE = 'GET /repos/{owner}/{repo}/issues'
 
 export interface Outputs {
   'deploy-rate': string
@@ -149,15 +159,23 @@ function noDataReason(
 export function metricsStatus(
   releases: Release[],
   pulls: PullRequest[],
-  core: Pick<ActionsCore, 'warning'>
+  core: Pick<ActionsCore, 'warning'>,
+  partial: PartialListings = {releases: false, pulls: false, issues: false}
 ): MetricsStatus {
   const check = (metric: MetricName): MetricStatus => {
     const reason = noDataReason(metric, releases, pulls)
-    if (reason === undefined) {
-      return 'computed'
+    if (reason !== undefined) {
+      core.warning(`${metric} defaulted to 0: ${reason}`)
     }
-    core.warning(`${metric} defaulted to 0: ${reason}`)
-    return 'no-data'
+    if (
+      partial.releases ||
+      (metric === 'lead-time' && partial.pulls) ||
+      ((metric === 'change-failure-rate' || metric === 'mttr') &&
+        partial.issues)
+    ) {
+      return 'partial'
+    }
+    return reason === undefined ? 'computed' : 'no-data'
   }
   return {
     'deploy-rate': check('deploy-rate'),
@@ -253,7 +271,13 @@ export async function run({inputs, client, core}: RunDeps): Promise<Outputs> {
     window
   ).GetAllIssuesLastMonth()
 
-  const status = metricsStatus(releaseList, pulls, core)
+  const wasPageCapped = (route: string): boolean =>
+    client.wasPageCapped?.(route) ?? false
+  const status = metricsStatus(releaseList, pulls, core, {
+    releases: wasPageCapped(RELEASES_ROUTE),
+    pulls: wasPageCapped(PULLS_ROUTE),
+    issues: wasPageCapped(ISSUES_ROUTE)
+  })
 
   const df = new DeployFrequency(releaseList, {window})
   const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client), {

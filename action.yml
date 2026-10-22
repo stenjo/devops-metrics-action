@@ -71,8 +71,9 @@ outputs:
 
   metrics-status: # which metrics had data to compute from
     description: 'JSON object mapping deploy-rate, lead-time,
-      change-failure-rate and mttr to "computed" or "no-data"; a "no-data"
-      metric was defaulted to 0 and a warning was written'
+      change-failure-rate and mttr to "computed", "no-data" or "partial";
+      "no-data" means a metric was defaulted to 0, and "partial" means a
+      listing hit the page cap'
 
 runs:
   using: 'node24'
