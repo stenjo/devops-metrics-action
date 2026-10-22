@@ -39145,6 +39145,7 @@ class GitHubApiError extends Error {
 class GitHubClient {
     octokit;
     limits;
+    pageCappedRoutes = new Set();
     // Last `x-ratelimit-remaining` seen on any response; undefined until one arrives.
     rateLimitRemaining;
     logger;
@@ -39212,6 +39213,9 @@ class GitHubClient {
             this.rateLimitRemaining = Number(remaining);
         }
     }
+    wasPageCapped(route) {
+        return this.pageCappedRoutes.has(route);
+    }
     async paginate(route, params = {}, options = {}) {
         const { perPage, maxPages } = this.limits;
         let result = [];
@@ -39230,6 +39234,7 @@ class GitHubClient {
                 return result;
             }
         }
+        this.pageCappedRoutes.add(route);
         this.logger.warning(`Stopped paging ${route} after ${maxPages.toString()} pages (${result.length.toString()} items); results may be incomplete`);
         return result;
     }
@@ -39801,6 +39806,9 @@ function serializeLog(entries, limits = defaultLogLimits()) {
 
 
 
+const RELEASES_ROUTE = 'GET /repos/{owner}/{repo}/releases';
+const PULLS_ROUTE = 'GET /repos/{owner}/{repo}/pulls';
+const ISSUES_ROUTE = 'GET /repos/{owner}/{repo}/issues';
 const TOKEN_REQUIRED_MESSAGE = 'A GitHub token is required: set the `token` input or the GH_TOKEN environment variable';
 // Every repository costs up to three paginated listings plus one request per
 // qualifying pull request, so a run is bounded here before any call is made.
@@ -39859,14 +39867,19 @@ function noDataReason(metric, releases, pulls) {
     return undefined;
 }
 // Reports which metrics have data to compute from, warning once per metric that has none.
-function metricsStatus(releases, pulls, core) {
+function metricsStatus(releases, pulls, core, partial = { releases: false, pulls: false, issues: false }) {
     const check = (metric) => {
         const reason = noDataReason(metric, releases, pulls);
-        if (reason === undefined) {
-            return 'computed';
+        if (reason !== undefined) {
+            core.warning(`${metric} defaulted to 0: ${reason}`);
         }
-        core.warning(`${metric} defaulted to 0: ${reason}`);
-        return 'no-data';
+        if (partial.releases ||
+            (metric === 'lead-time' && partial.pulls) ||
+            ((metric === 'change-failure-rate' || metric === 'mttr') &&
+                partial.issues)) {
+            return 'partial';
+        }
+        return reason === undefined ? 'computed' : 'no-data';
     };
     return {
         'deploy-rate': check('deploy-rate'),
@@ -39931,7 +39944,12 @@ async function run({ inputs, client, core }) {
     const releaseList = await new ReleaseAdapter(client, owner, repositories, window).GetAllReleasesLastMonth();
     const pulls = await new PullRequestsAdapter(client, owner, repositories, window).GetAllPRsLastMonth();
     const issueList = await new IssuesAdapter(client, owner, repositories, window).GetAllIssuesLastMonth();
-    const status = metricsStatus(releaseList, pulls, core);
+    const wasPageCapped = (route) => client.wasPageCapped?.(route) ?? false;
+    const status = metricsStatus(releaseList, pulls, core, {
+        releases: wasPageCapped(RELEASES_ROUTE),
+        pulls: wasPageCapped(PULLS_ROUTE),
+        issues: wasPageCapped(ISSUES_ROUTE)
+    });
     const df = new DeployFrequency(releaseList, { window });
     const lt = new LeadTime(pulls, releaseList, new CommitsAdapter(client), {
         window,

@@ -432,6 +432,7 @@ describe('GitHubClient', () => {
       expect(mockRequest.mock.calls[0][1].page).toBe(1)
       expect(mockRequest.mock.calls[98][1].page).toBe(99)
       expect(result.length).toBe(9900)
+      expect(client.wasPageCapped('GET /x')).toBe(true)
       expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
         'Stopped paging GET /x after 99 pages (9900 items); results may be incomplete'
       )
@@ -449,6 +450,7 @@ describe('GitHubClient', () => {
 
       expect(result.length).toBe(12)
       expect(mockRequest.mock.calls.map(c => c[1].per_page)).toEqual([5, 5, 5])
+      expect(client.wasPageCapped('GET /x')).toBe(false)
       expect(logger.warning).not.toHaveBeenCalled()
     })
 
@@ -461,6 +463,7 @@ describe('GitHubClient', () => {
 
       expect(result.length).toBe(10)
       expect(mockRequest).toHaveBeenCalledTimes(2)
+      expect(client.wasPageCapped('GET /x')).toBe(true)
       expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
         'Stopped paging GET /x after 2 pages (10 items); results may be incomplete'
       )

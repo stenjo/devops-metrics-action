@@ -916,6 +916,55 @@ describe('run', () => {
     ).rejects.toThrow()
     expect(fake.info).not.toHaveBeenCalled()
   })
+
+  it.each([
+    [
+      'releases',
+      'GET /repos/{owner}/{repo}/releases',
+      {
+        'deploy-rate': 'partial',
+        'lead-time': 'partial',
+        'change-failure-rate': 'partial',
+        mttr: 'partial'
+      }
+    ],
+    [
+      'pull requests',
+      'GET /repos/{owner}/{repo}/pulls',
+      {
+        'deploy-rate': 'computed',
+        'lead-time': 'partial',
+        'change-failure-rate': 'computed',
+        mttr: 'computed'
+      }
+    ],
+    [
+      'issues',
+      'GET /repos/{owner}/{repo}/issues',
+      {
+        'deploy-rate': 'computed',
+        'lead-time': 'computed',
+        'change-failure-rate': 'partial',
+        mttr: 'partial'
+      }
+    ]
+  ])(
+    'marks metrics depending on a page-capped %s listing as partial',
+    async (_listing, cappedRoute, expected) => {
+      const partialClient = {
+        wasPageCapped: (route: string) => route === cappedRoute,
+        rateLimitRemaining: undefined
+      } as unknown as GitHubClient
+
+      const outputs = await run({
+        inputs: inputsWith(),
+        client: partialClient,
+        core: fakeCore({})
+      })
+
+      expect(JSON.parse(outputs['metrics-status'])).toEqual(expected)
+    }
+  )
 })
 
 describe('metricsStatus', () => {
