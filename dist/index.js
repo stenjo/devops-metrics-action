@@ -39124,19 +39124,19 @@ retry.VERSION = plugin_retry_dist_bundle_VERSION;
 
 // A function rather than constants so the values are not static mutants for Stryker.
 function defaultClientLimits() {
-    return { perPage: 100, maxPages: 99 };
+    return { perPage: 100, maxPages: 99, maxRequests: 1000 };
 }
+const MAX_PRIMARY_RATE_LIMIT_WAIT_SECONDS = 60;
 // Stable, URL/body-free failure message; the raw Octokit error is kept as `cause`.
 class GitHubApiError extends Error {
     status;
     route;
-    constructor(route, cause) {
+    constructor(route, cause, message) {
         const status = typeof cause?.status === 'number'
             ? cause.status
             : undefined;
-        super(`GitHub API request failed (${status ?? 'unknown'}) for ${route}`, {
-            cause
-        });
+        super(message ??
+            `GitHub API request failed (${status ?? 'unknown'}) for ${route}`, { cause });
         this.name = 'GitHubApiError';
         this.status = status;
         this.route = route;
@@ -39149,15 +39149,19 @@ class GitHubClient {
     // Last `x-ratelimit-remaining` seen on any response; undefined until one arrives.
     rateLimitRemaining;
     logger;
+    maxRequests;
+    requestsMade = 0;
     constructor(options = {}, limits = defaultClientLimits()) {
         this.logger = options.logger ?? { warning: () => undefined };
         this.limits = limits;
+        this.maxRequests = limits.maxRequests ?? 1000;
         const ThrottledOctokit = Octokit.plugin(throttling, retry);
         const throttle = {
-            // Primary limit: wait for the reset once, then give up.
+            // Primary limit: wait for the reset once only when it is near.
             onRateLimit: (retryAfter, request, _octokit, retryCount) => {
-                const retrying = retryCount < 1;
-                this.logger.warning(`GitHub API rate limit exhausted for ${request.method} ${request.url}; ${retrying ? `retrying in ${retryAfter.toString()}s` : 'giving up'}`);
+                const resetAt = new Date(Date.now() + retryAfter * 1000).toISOString();
+                const retrying = retryCount < 1 && retryAfter <= MAX_PRIMARY_RATE_LIMIT_WAIT_SECONDS;
+                this.logger.warning(`GitHub API rate limit exhausted for ${request.method} ${request.url}; ${retrying ? `retrying in ${retryAfter.toString()}s` : 'giving up'}; rate limit resets at ${resetAt}`);
                 return retrying;
             },
             // Secondary (abuse) limit: back off entirely rather than hammer the API.
@@ -39178,6 +39182,10 @@ class GitHubClient {
         if (!/^[A-Z]+ \//.test(route)) {
             throw new TypeError(`Refusing to request a non-route URL: ${route}`);
         }
+        if (this.requestsMade >= this.maxRequests) {
+            throw new GitHubApiError(route, undefined, `GitHub API request budget exceeded (${this.maxRequests}) for ${route}`);
+        }
+        this.requestsMade++;
         try {
             const result = await this.octokit.request(route, {
                 ...params,
@@ -39187,6 +39195,15 @@ class GitHubClient {
             return result.data;
         }
         catch (e) {
+            const headers = e
+                ?.response?.headers;
+            const reset = headers?.['x-ratelimit-reset'];
+            if (headers?.['x-ratelimit-remaining'] === '0' &&
+                typeof reset === 'string' &&
+                /^\d+$/.test(reset)) {
+                const resetAt = new Date(Number(reset) * 1000).toISOString();
+                throw new GitHubApiError(route, e, `GitHub API rate limit retry abandoned for ${route}; rate limit resets at ${resetAt}`);
+            }
             throw new GitHubApiError(route, e);
         }
     }

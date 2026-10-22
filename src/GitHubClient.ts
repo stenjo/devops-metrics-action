@@ -13,14 +13,17 @@ export interface GitHubClientOptions {
 export interface ClientLimits {
   perPage: number
   maxPages: number
+  maxRequests?: number
 }
 
 // A function rather than constants so the values are not static mutants for Stryker.
 export function defaultClientLimits(): ClientLimits {
-  return {perPage: 100, maxPages: 99}
+  return {perPage: 100, maxPages: 99, maxRequests: 1000}
 }
 
 export type RequestParams = Record<string, unknown>
+
+const MAX_PRIMARY_RATE_LIMIT_WAIT_SECONDS = 60
 
 export interface PaginateOptions<T> {
   // Stop paging at the first item matching; that item and the rest are dropped.
@@ -32,14 +35,16 @@ export class GitHubApiError extends Error {
   readonly status: number | undefined
   readonly route: string
 
-  constructor(route: string, cause: unknown) {
+  constructor(route: string, cause: unknown, message?: string) {
     const status =
       typeof (cause as {status?: unknown})?.status === 'number'
         ? (cause as {status: number}).status
         : undefined
-    super(`GitHub API request failed (${status ?? 'unknown'}) for ${route}`, {
-      cause
-    })
+    super(
+      message ??
+        `GitHub API request failed (${status ?? 'unknown'}) for ${route}`,
+      {cause}
+    )
     this.name = 'GitHubApiError'
     this.status = status
     this.route = route
@@ -53,6 +58,8 @@ export class GitHubClient {
   // Last `x-ratelimit-remaining` seen on any response; undefined until one arrives.
   rateLimitRemaining: number | undefined
   private readonly logger: Pick<Logger, 'warning'>
+  private readonly maxRequests: number
+  private requestsMade = 0
 
   constructor(
     options: GitHubClientOptions = {},
@@ -60,15 +67,18 @@ export class GitHubClient {
   ) {
     this.logger = options.logger ?? {warning: () => undefined}
     this.limits = limits
+    this.maxRequests = limits.maxRequests ?? 1000
     const ThrottledOctokit = Octokit.plugin(throttling, retry)
     const throttle: ThrottlingOptions = {
-      // Primary limit: wait for the reset once, then give up.
+      // Primary limit: wait for the reset once only when it is near.
       onRateLimit: (retryAfter, request, _octokit, retryCount) => {
-        const retrying = retryCount < 1
+        const resetAt = new Date(Date.now() + retryAfter * 1000).toISOString()
+        const retrying =
+          retryCount < 1 && retryAfter <= MAX_PRIMARY_RATE_LIMIT_WAIT_SECONDS
         this.logger.warning(
           `GitHub API rate limit exhausted for ${request.method} ${request.url}; ${
             retrying ? `retrying in ${retryAfter.toString()}s` : 'giving up'
-          }`
+          }; rate limit resets at ${resetAt}`
         )
         return retrying
       },
@@ -93,6 +103,14 @@ export class GitHubClient {
     if (!/^[A-Z]+ \//.test(route)) {
       throw new TypeError(`Refusing to request a non-route URL: ${route}`)
     }
+    if (this.requestsMade >= this.maxRequests) {
+      throw new GitHubApiError(
+        route,
+        undefined,
+        `GitHub API request budget exceeded (${this.maxRequests}) for ${route}`
+      )
+    }
+    this.requestsMade++
     try {
       const result = await this.octokit.request(route, {
         ...params,
@@ -101,6 +119,21 @@ export class GitHubClient {
       this.recordRateLimit(result.headers)
       return result.data as T
     } catch (e: unknown) {
+      const headers = (e as {response?: {headers?: Record<string, unknown>}})
+        ?.response?.headers
+      const reset = headers?.['x-ratelimit-reset']
+      if (
+        headers?.['x-ratelimit-remaining'] === '0' &&
+        typeof reset === 'string' &&
+        /^\d+$/.test(reset)
+      ) {
+        const resetAt = new Date(Number(reset) * 1000).toISOString()
+        throw new GitHubApiError(
+          route,
+          e,
+          `GitHub API rate limit retry abandoned for ${route}; rate limit resets at ${resetAt}`
+        )
+      }
       throw new GitHubApiError(route, e)
     }
   }

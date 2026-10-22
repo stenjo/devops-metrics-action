@@ -327,12 +327,15 @@ requests per hour for `GITHUB_TOKEN`), the action bounds itself:
 | Pages per listing per repository        | 99    | Paging stops and a warning is written; results for that listing are incomplete. |
 | Pull requests whose commits are fetched | 200   | A warning is written; `lead-time` is computed from the first 200.               |
 | Commit requests in flight at once       | 4     | —                                                                               |
+| Total requests per run                  | 1,000 | The run fails before sending the request that exceeds the budget.               |
 
 Requests are issued through the Octokit `throttling` and `retry` plugins: a
-primary rate limit is waited out and retried once, a secondary (abuse) limit
-is logged and not retried, and transient `5xx` / network failures are retried
-with backoff. The remaining rate limit (`x-ratelimit-remaining`) is written to
-the log at the end of every successful run.
+primary rate limit is retried once only when its reset is within 60 seconds;
+otherwise the request fails with the reset time in the error, avoiding an
+hour-long wait. A secondary (abuse) limit is logged and not retried, and
+transient `5xx` / network failures are retried with backoff. The remaining rate
+limit (`x-ratelimit-remaining`) is written to the log at the end of every
+successful run.
 
 ## Usage
 
