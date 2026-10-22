@@ -6,26 +6,24 @@ on:
       - main
   schedule:
     - cron: '30 0 * * *'
+  workflow_dispatch:
 
+# The action only reads; the job that commits badges gets contents: write.
 permissions:
-  contents: write
+  contents: read
+  pull-requests: read
+  issues: read
 
 jobs:
-  update-metrics:
+  metrics:
     runs-on: ubuntu-latest
     name: Checking the dora metrics
+    outputs:
+      deploy-rate: ${{ steps.dora.outputs.deploy-rate }}
+      lead-time: ${{ steps.dora.outputs.lead-time }}
+      change-failure-rate: ${{ steps.dora.outputs.change-failure-rate }}
+      mttr: ${{ steps.dora.outputs.mttr }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup Node.js
-        id: setup-node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
-        with:
-          node-version-file: .node-version
-          cache: npm
-
       - name: DevOps Metrics from GitHub
         uses: stenjo/devops-metrics-action@113a5f73a92b8cd2b69047591eac8d0d9e1806b9 # v2.0.0
         id: dora
@@ -45,12 +43,29 @@ jobs:
       - name: Get the mean time to restore
         run: echo "The mean time to restore was ${{ steps.dora.outputs.mttr }}"
 
+  update-badges:
+    runs-on: ubuntu-latest
+    name: Update DORA metric badges
+    needs: metrics
+    # Only this job pushes to main.
+    permissions:
+      contents: write
+    env:
+      DEPLOY_RATE: ${{ needs.metrics.outputs.deploy-rate }}
+      LEAD_TIME: ${{ needs.metrics.outputs.lead-time }}
+      CHANGE_FAILURE_RATE: ${{ needs.metrics.outputs.change-failure-rate }}
+      MTTR: ${{ needs.metrics.outputs.mttr }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Generate DORA badges
         run: |
           mkdir -p badges
 
           # Deploy Rate badge (higher is better: green >= 7, yellow >= 4, orange >= 1)
-          RATE="${{ steps.dora.outputs.deploy-rate }}"
+          RATE="$DEPLOY_RATE"
           if [ "$(echo "$RATE >= 7" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
           elif [ "$(echo "$RATE >= 4" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
           elif [ "$(echo "$RATE >= 1" | bc -l)" -eq 1 ]; then COLOR="yellow";
@@ -58,7 +73,7 @@ jobs:
           curl -s "https://img.shields.io/badge/Deploy%20Rate-${RATE}-${COLOR}" > badges/deploy-rate.svg
 
           # Lead Time badge (lower is better: green <= 3, yellow <= 5, orange <= 7)
-          LT="${{ steps.dora.outputs.lead-time }}"
+          LT="$LEAD_TIME"
           if [ "$(echo "$LT <= 3" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
           elif [ "$(echo "$LT <= 5" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
           elif [ "$(echo "$LT <= 7" | bc -l)" -eq 1 ]; then COLOR="yellow";
@@ -66,7 +81,7 @@ jobs:
           curl -s "https://img.shields.io/badge/Lead%20Time-${LT}-${COLOR}" > badges/lead-time.svg
 
           # Change Failure Rate badge (lower is better: green <= 1, yellow <= 8, orange <= 15)
-          CFR="${{ steps.dora.outputs.change-failure-rate }}"
+          CFR="$CHANGE_FAILURE_RATE"
           if [ "$(echo "$CFR <= 1" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
           elif [ "$(echo "$CFR <= 8" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
           elif [ "$(echo "$CFR <= 15" | bc -l)" -eq 1 ]; then COLOR="yellow";
@@ -74,7 +89,6 @@ jobs:
           curl -s "https://img.shields.io/badge/Change%20Failure%20Rate-${CFR}%25-${COLOR}" > badges/change-failure-rate.svg
 
           # Mean Time to Restore badge (lower is better: green <= 1, yellow <= 2, orange <= 3)
-          MTTR="${{ steps.dora.outputs.mttr }}"
           if [ "$(echo "$MTTR <= 1" | bc -l)" -eq 1 ]; then COLOR="brightgreen";
           elif [ "$(echo "$MTTR <= 2" | bc -l)" -eq 1 ]; then COLOR="yellowgreen";
           elif [ "$(echo "$MTTR <= 3" | bc -l)" -eq 1 ]; then COLOR="yellow";
@@ -82,6 +96,7 @@ jobs:
           curl -s "https://img.shields.io/badge/Mean%20Time%20to%20Restore-${MTTR}-${COLOR}" > badges/mean-time-to-restore.svg
 
       - name: Commit badges
+        if: github.ref_name == 'main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
