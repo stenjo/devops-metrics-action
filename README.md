@@ -143,7 +143,8 @@ Rate of deploys (tagged releases) per week over the 30-day window. Decimal
 number. Elite performing teams has 7 as target (daily- or on-demand release)
 
 `deploy-rate-log` - a JSON array of the releases forming the basis for the
-metric, if `logging` is enabled. See [Log outputs](#log-outputs).
+metric, if `logging` is enabled. See [List the records behind a
+metric](#list-the-records-behind-a-metric) and [Log outputs](#log-outputs).
 
 ### `lead-time`
 
@@ -152,6 +153,7 @@ main branch. Number in days (Integer)
 
 `lead-time-log` - a JSON array of the pull requests with matching first commit
 and release forming the basis for the metric, if `logging` is enabled. See
+[List the records behind a metric](#list-the-records-behind-a-metric) and
 [Log outputs](#log-outputs).
 
 ### `change-failure-rate`
@@ -163,7 +165,9 @@ the failures over releases rate. Number in range 0 - 100 (%)
 
 `change-failure-rate-log` - a JSON array of the releases counted as failed,
 each with the bugs opened before the next release, if `logging` is enabled.
-See [Log outputs](#log-outputs).
+This log was added in [#239](https://github.com/stenjo/devops-metrics-action/issues/239).
+See [List the records behind a metric](#list-the-records-behind-a-metric) and
+[Log outputs](#log-outputs).
 
 ### `mttr`
 
@@ -176,7 +180,10 @@ decimals)
 
 `mttr-log` - a JSON array of the bugs the mean is based on, each with the
 release before it was opened and the release after it was closed, if `logging`
-is enabled. See [Log outputs](#log-outputs).
+is enabled. This log was added in
+[#239](https://github.com/stenjo/devops-metrics-action/issues/239). See
+[List the records behind a metric](#list-the-records-behind-a-metric) and
+[Log outputs](#log-outputs).
 
 ### `metrics-status`
 
@@ -294,53 +301,9 @@ The logs are safe by construction:
 - Each log is capped at 500 records and just under 1 MiB (GitHub's output
   limit). When cut, the last record is `{"kind": "truncated", "omitted": n}`.
 
-Use `fromJSON` to work with the records in expressions, or `jq` in a script:
-
-```yaml
-- name: DevOps Metrics from GitHub
-  uses: stenjo/devops-metrics-action@v2
-  id: dora
-  with:
-    logging: true
-
-- name: Releases behind the deploy rate
-  env:
-    RELEASES: ${{ join(fromJSON(steps.dora.outputs.deploy-rate-log).*.name, ', ') }}
-  run: echo "Releases last month: $RELEASES"
-
-- name: Lead-time table
-  env:
-    LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
-  run: |
-    {
-      echo '| Repository | Merged | Pull request | Released | Days |'
-      echo '| --- | --- | --- | --- | --- |'
-      jq -r '.[] | select(.kind == "pull")
-        | "| \(.repo) | \(.at) | \(.title) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
-    } >> "$GITHUB_STEP_SUMMARY"
-
-- name: Failed releases behind the change failure rate
-  env:
-    CFR_LOG: ${{ steps.dora.outputs.change-failure-rate-log }}
-  run: |
-    {
-      echo '| Repository | Published | Release | Bugs opened before next release |'
-      echo '| --- | --- | --- | --- |'
-      jq -r '.[] | select(.kind == "failed-release")
-        | "| \(.repo) | \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title)"] | join("<br>")) |"' <<< "$CFR_LOG"
-    } >> "$GITHUB_STEP_SUMMARY"
-
-- name: Bugs behind the mean time to restore
-  env:
-    MTTR_LOG: ${{ steps.dora.outputs.mttr-log }}
-  run: |
-    {
-      echo '| Repository | Bug | Opened | Closed | Release before | Release after | Days |'
-      echo '| --- | --- | --- | --- | --- | --- | --- |'
-      jq -r '.[] | select(.kind == "restore")
-        | "| \(.repo) | #\(.number) \(.title) | \(.createdAt) | \(.closedAt) | \(.releaseBefore) | \(.releaseAfter) | \(.restoreDays) |"' <<< "$MTTR_LOG"
-    } >> "$GITHUB_STEP_SUMMARY"
-```
+See [List the records behind a metric](#list-the-records-behind-a-metric) in
+Usage for a complete example that writes all four record lists to the step
+summary.
 
 > [!NOTE]
 > **Migrating from v1:** the logs used to be newline-separated free text
@@ -434,6 +397,67 @@ More complex examples may be found in
 [.github/workflows/badges.yaml](https://github.com/stenjo/devops-metrics-action/blob/main/.github/workflows/badges.yaml)
 and
 [.github/workflows/dora.yaml](https://github.com/stenjo/devops-metrics-action/blob/main/.github/workflows/dora.yaml)
+
+### List the records behind a metric
+
+Set `logging: true` and pass each log output through `env:` before parsing it.
+The logs are capped at 500 records and just under 1 MiB; if a cap is reached,
+the final `{"kind":"truncated","omitted":n}` record reports how many records
+were left out. The following example renders each metric and its records as a
+table in the workflow summary:
+
+```yaml
+- name: DevOps Metrics from GitHub
+  uses: stenjo/devops-metrics-action@v2
+  id: dora
+  with:
+    token: ${{ secrets.GITHUB_TOKEN }}
+    logging: true
+
+- name: Install jq
+  uses: dcarbone/install-jq-action@4fcb5062d7ce9bc4382d1a352d19ba3ba2c317c1 # v4.0.1
+
+- name: Summarize metric records
+  env:
+    DEPLOY_RATE: ${{ steps.dora.outputs.deploy-rate }}
+    LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
+    CHANGE_FAILURE_RATE: ${{ steps.dora.outputs.change-failure-rate }}
+    MTTR: ${{ steps.dora.outputs.mttr }}
+    DEPLOY_RATE_LOG: ${{ steps.dora.outputs.deploy-rate-log }}
+    LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
+    CFR_LOG: ${{ steps.dora.outputs.change-failure-rate-log }}
+    MTTR_LOG: ${{ steps.dora.outputs.mttr-log }}
+  run: |
+    {
+      echo "## Releases behind deploy frequency ($DEPLOY_RATE deploys/week)"
+      echo
+      echo '| Repository | Published | Release |'
+      echo '| --- | --- | --- |'
+      jq -r '.[] | select(.kind == "release") | "| \(.repo) | \(.at) | \(.name | gsub("\\|"; "\\|")) |"' <<< "$DEPLOY_RATE_LOG"
+      jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$DEPLOY_RATE_LOG"
+      echo
+      echo "## Pull requests behind lead time ($LEAD_TIME days)"
+      echo
+      echo '| Repository | Merged | Pull request | First commit | Released | Days |'
+      echo '| --- | --- | --- | --- | --- | --- |'
+      jq -r '.[] | select(.kind == "pull") | "| \(.repo) | \(.at) | \(.title | gsub("\\|"; "\\|")) | \(.commitAt) | \(.release | gsub("\\|"; "\\|")) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
+      jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$LEAD_TIME_LOG"
+      echo
+      echo "## Releases behind change failure rate ($CHANGE_FAILURE_RATE%)"
+      echo
+      echo '| Repository | Published | Release | Bugs opened before next release |'
+      echo '| --- | --- | --- | --- |'
+      jq -r '.[] | select(.kind == "failed-release") | "| \(.repo) | \(.at) | \(.name | gsub("\\|"; "\\|")) | \([.bugs[] | "#\(.number) \(.title | gsub("\\|"; "\\|"))"] | join("<br>")) |"' <<< "$CFR_LOG"
+      jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$CFR_LOG"
+      echo
+      echo "## Bugs behind mean time to restore ($MTTR days)"
+      echo
+      echo '| Repository | Bug | Opened | Closed | Release before | Release after | Days |'
+      echo '| --- | --- | --- | --- | --- | --- | --- |'
+      jq -r '.[] | select(.kind == "restore") | "| \(.repo) | #\(.number) \(.title | gsub("\\|"; "\\|")) | \(.createdAt) | \(.closedAt) | \(.releaseBefore | gsub("\\|"; "\\|")) | \(.releaseAfter | gsub("\\|"; "\\|")) | \(.restoreDays) |"' <<< "$MTTR_LOG"
+      jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$MTTR_LOG"
+    } >> "$GITHUB_STEP_SUMMARY"
+```
 
 Badges at the top of this file is generated through the badges.yaml workflow.
 More on this in [Create badges for metrics output](badges.md)

@@ -48,6 +48,10 @@ jobs:
       # The *-log outputs are JSON arrays; parse them, never echo them.
       - name: Summarize metric logs
         env:
+          DEPLOY_RATE: ${{ steps.dora.outputs.deploy-rate }}
+          LEAD_TIME: ${{ steps.dora.outputs.lead-time }}
+          CHANGE_FAILURE_RATE: ${{ steps.dora.outputs.change-failure-rate }}
+          MTTR: ${{ steps.dora.outputs.mttr }}
           DEPLOY_RATE_LOG: ${{ steps.dora.outputs.deploy-rate-log }}
           LEAD_TIME_LOG: ${{ steps.dora.outputs.lead-time-log }}
           CFR_LOG: ${{ steps.dora.outputs.change-failure-rate-log }}
@@ -57,31 +61,32 @@ jobs:
             jq -e 'type == "array"' <<< "$log" > /dev/null
           done
           {
-            echo '## Releases behind the deploy rate'
+            echo "## Releases behind deploy frequency ($DEPLOY_RATE deploys/week)"
             echo
-            echo '| Published | Release |'
-            echo '| --- | --- |'
-            jq -r '.[] | select(.kind == "release") | "| \(.at) | \(.name) |"' <<< "$DEPLOY_RATE_LOG"
+            echo '| Repository | Published | Release |'
+            echo '| --- | --- | --- |'
+            jq -r '.[] | select(.kind == "release") | "| \(.repo) | \(.at) | \(.name | gsub("\\|"; "\\|")) |"' <<< "$DEPLOY_RATE_LOG"
+            jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$DEPLOY_RATE_LOG"
             echo
-            echo '## Pull requests behind the lead time'
+            echo "## Pull requests behind lead time ($LEAD_TIME days)"
             echo
-            echo '| Merged | Pull request | Released | Days |'
-            echo '| --- | --- | --- | --- |'
-            jq -r '.[] | select(.kind == "pull") | "| \(.at) | \(.title | gsub("\\|"; "\\|")) | \(.release) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
+            echo '| Repository | Merged | Pull request | First commit | Released | Days |'
+            echo '| --- | --- | --- | --- | --- | --- |'
+            jq -r '.[] | select(.kind == "pull") | "| \(.repo) | \(.at) | \(.title | gsub("\\|"; "\\|")) | \(.commitAt) | \(.release | gsub("\\|"; "\\|")) | \(.leadTimeDays) |"' <<< "$LEAD_TIME_LOG"
             jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$LEAD_TIME_LOG"
             echo
-            echo '## Releases behind the change failure rate'
+            echo "## Releases behind change failure rate ($CHANGE_FAILURE_RATE%)"
             echo
-            echo '| Published | Release | Bugs opened before next release |'
-            echo '| --- | --- | --- |'
-            jq -r '.[] | select(.kind == "failed-release") | "| \(.at) | \(.name) | \([.bugs[] | "#\(.number) \(.title | gsub("\\|"; "\\|"))"] | join("<br>")) |"' <<< "$CFR_LOG"
+            echo '| Repository | Published | Release | Bugs opened before next release |'
+            echo '| --- | --- | --- | --- |'
+            jq -r '.[] | select(.kind == "failed-release") | "| \(.repo) | \(.at) | \(.name | gsub("\\|"; "\\|")) | \([.bugs[] | "#\(.number) \(.title | gsub("\\|"; "\\|"))"] | join("<br>")) |"' <<< "$CFR_LOG"
             jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$CFR_LOG"
             echo
-            echo '## Bugs behind the mean time to restore'
+            echo "## Bugs behind mean time to restore ($MTTR days)"
             echo
-            echo '| Bug | Opened | Closed | Release before | Release after | Days |'
-            echo '| --- | --- | --- | --- | --- | --- |'
-            jq -r '.[] | select(.kind == "restore") | "| #\(.number) \(.title | gsub("\\|"; "\\|")) | \(.createdAt) | \(.closedAt) | \(.releaseBefore) | \(.releaseAfter) | \(.restoreDays) |"' <<< "$MTTR_LOG"
+            echo '| Repository | Bug | Opened | Closed | Release before | Release after | Days |'
+            echo '| --- | --- | --- | --- | --- | --- | --- |'
+            jq -r '.[] | select(.kind == "restore") | "| \(.repo) | #\(.number) \(.title | gsub("\\|"; "\\|")) | \(.createdAt) | \(.closedAt) | \(.releaseBefore | gsub("\\|"; "\\|")) | \(.releaseAfter | gsub("\\|"; "\\|")) | \(.restoreDays) |"' <<< "$MTTR_LOG"
             jq -r '.[] | select(.kind == "truncated") | "\n_\(.omitted) more omitted_"' <<< "$MTTR_LOG"
           } >> "$GITHUB_STEP_SUMMARY"
 
