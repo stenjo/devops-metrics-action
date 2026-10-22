@@ -39697,7 +39697,12 @@ class LeadTime {
                 !(pull.title.startsWith('feat') || pull.title.startsWith('fix'))) {
                 continue;
             }
-            const release = this.releases.find(r => r.publishedAt > pull.mergedAt && r.repo === pull.repo);
+            const release = this.releases.reduce((earliest, candidate) => candidate.repo === pull.repo &&
+                candidate.publishedAt > pull.mergedAt &&
+                (earliest === undefined ||
+                    candidate.publishedAt < earliest.publishedAt)
+                ? candidate
+                : earliest, undefined);
             if (release === undefined) {
                 continue;
             }
