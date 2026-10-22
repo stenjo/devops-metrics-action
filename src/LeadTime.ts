@@ -91,8 +91,15 @@ export class LeadTime {
       ) {
         continue
       }
-      const release = this.releases.find(
-        r => r.publishedAt > pull.mergedAt && r.repo === pull.repo
+      const release = this.releases.reduce<Release | undefined>(
+        (earliest, candidate) =>
+          candidate.repo === pull.repo &&
+          candidate.publishedAt > pull.mergedAt &&
+          (earliest === undefined ||
+            candidate.publishedAt < earliest.publishedAt)
+            ? candidate
+            : earliest,
+        undefined
       )
       if (release === undefined) {
         continue
