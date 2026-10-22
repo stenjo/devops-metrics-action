@@ -44,6 +44,7 @@ describe('GitHubClient', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
   })
 
   describe('constructor', () => {
@@ -80,8 +81,16 @@ describe('GitHubClient', () => {
     })
 
     it('uses the default limits of 100 items per page and 99 pages', () => {
-      expect(new GitHubClient().limits).toEqual({perPage: 100, maxPages: 99})
-      expect(defaultClientLimits()).toEqual({perPage: 100, maxPages: 99})
+      expect(new GitHubClient().limits).toEqual({
+        perPage: 100,
+        maxPages: 99,
+        maxRequests: 1000
+      })
+      expect(defaultClientLimits()).toEqual({
+        perPage: 100,
+        maxPages: 99,
+        maxRequests: 1000
+      })
     })
 
     it('starts with an unknown remaining rate limit', () => {
@@ -97,13 +106,34 @@ describe('GitHubClient', () => {
       new GitHubClient({token: 't', logger})
     })
 
-    it('retries once on the primary rate limit and warns with the wait', () => {
+    it('retries once below the primary rate-limit wait cap and logs the reset time', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-10-22T00:00:00.000Z'))
       const {onRateLimit} = constructorOptions().throttle
+      const resetAt = new Date(Date.now() + 42_000).toISOString()
 
       expect(onRateLimit(42, requestOptions, {} as Octokit, 0)).toBe(true)
       expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
-        'GitHub API rate limit exhausted for GET /repos/{owner}/{repo}/releases; retrying in 42s'
+        `GitHub API rate limit exhausted for GET /repos/{owner}/{repo}/releases; retrying in 42s; rate limit resets at ${resetAt}`
       )
+    })
+
+    it('does not retry above the primary rate-limit wait cap and logs the reset time', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-10-22T00:00:00.000Z'))
+      const {onRateLimit} = constructorOptions().throttle
+      const resetAt = new Date(Date.now() + 61_000).toISOString()
+
+      expect(onRateLimit(61, requestOptions, {} as Octokit, 0)).toBe(false)
+      expect(logger.warning).toHaveBeenCalledExactlyOnceWith(
+        `GitHub API rate limit exhausted for GET /repos/{owner}/{repo}/releases; giving up; rate limit resets at ${resetAt}`
+      )
+    })
+
+    it('allows a retry at the primary rate-limit wait cap', () => {
+      const {onRateLimit} = constructorOptions().throttle
+
+      expect(onRateLimit(60, requestOptions, {} as Octokit, 0)).toBe(true)
     })
 
     it('gives up on the primary rate limit after one retry', () => {
@@ -112,7 +142,7 @@ describe('GitHubClient', () => {
       expect(onRateLimit(42, requestOptions, {} as Octokit, 1)).toBe(false)
       expect(onRateLimit(42, requestOptions, {} as Octokit, 2)).toBe(false)
       expect(logger.warning).toHaveBeenLastCalledWith(
-        'GitHub API rate limit exhausted for GET /repos/{owner}/{repo}/releases; giving up'
+        expect.stringContaining('; giving up; rate limit resets at ')
       )
     })
 
@@ -183,6 +213,23 @@ describe('GitHubClient', () => {
       })
     })
 
+    it('fails with a stable error when the per-client request budget is exceeded', async () => {
+      mockRequest.mockResolvedValue({data: 'ok'})
+      const client = new GitHubClient(
+        {},
+        {perPage: 5, maxPages: 2, maxRequests: 2}
+      )
+
+      await client.request('GET /first')
+      await client.request('GET /second')
+
+      await expect(client.request('GET /third')).rejects.toMatchObject({
+        name: 'GitHubApiError',
+        message: 'GitHub API request budget exceeded (2) for GET /third'
+      })
+      expect(mockRequest).toHaveBeenCalledTimes(2)
+    })
+
     it('wraps errors in a GitHubApiError with a stable message, status, route and cause', async () => {
       const cause = Object.assign(new Error('Forbidden: see https://x/y'), {
         status: 403
@@ -198,6 +245,27 @@ describe('GitHubClient', () => {
         message: 'GitHub API request failed (403) for GET /x',
         status: 403,
         route: 'GET /x',
+        cause
+      })
+    })
+
+    it('includes the primary rate-limit reset time in the API error', async () => {
+      const reset = Math.ceil((Date.now() + 3_600_000) / 1000)
+      const cause = Object.assign(new Error('API rate limit exceeded'), {
+        status: 403,
+        response: {
+          headers: {
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': reset.toString()
+          }
+        }
+      })
+      mockRequest.mockRejectedValue(cause)
+      const client = new GitHubClient()
+
+      await expect(client.request('GET /x')).rejects.toMatchObject({
+        name: 'GitHubApiError',
+        message: `GitHub API rate limit retry abandoned for GET /x; rate limit resets at ${new Date(reset * 1000).toISOString()}`,
         cause
       })
     })
