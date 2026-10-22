@@ -49,6 +49,7 @@ export class GitHubApiError extends Error {
 export class GitHubClient {
   readonly octokit: Octokit
   readonly limits: ClientLimits
+  private readonly pageCappedRoutes = new Set<string>()
   // Last `x-ratelimit-remaining` seen on any response; undefined until one arrives.
   rateLimitRemaining: number | undefined
   private readonly logger: Pick<Logger, 'warning'>
@@ -111,6 +112,10 @@ export class GitHubClient {
     }
   }
 
+  wasPageCapped(route: string): boolean {
+    return this.pageCappedRoutes.has(route)
+  }
+
   async paginate<T>(
     route: string,
     params: RequestParams = {},
@@ -133,6 +138,7 @@ export class GitHubClient {
         return result
       }
     }
+    this.pageCappedRoutes.add(route)
     this.logger.warning(
       `Stopped paging ${route} after ${maxPages.toString()} pages (${result.length.toString()} items); results may be incomplete`
     )
