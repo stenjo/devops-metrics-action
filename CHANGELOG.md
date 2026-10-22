@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.2](https://github.com/stenjo/devops-metrics-action/compare/v2.1.1...v2.1.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **ci:** autostash before rebasing badge commits onto main ([#501](https://github.com/stenjo/devops-metrics-action/issues/501)) ([0c9f127](https://github.com/stenjo/devops-metrics-action/commit/0c9f127dd557bc3160785dc53990547a56e1f7cd)), closes [#500](https://github.com/stenjo/devops-metrics-action/issues/500)
+* **ci:** open release-please PRs with a GitHub App token ([#503](https://github.com/stenjo/devops-metrics-action/issues/503)) ([168d61a](https://github.com/stenjo/devops-metrics-action/commit/168d61ac9763d7249aba2bed31348eeacb7e62c5))
+* lead time to use the earliest later release ([#510](https://github.com/stenjo/devops-metrics-action/issues/510)) ([375e7a7](https://github.com/stenjo/devops-metrics-action/commit/375e7a7b173bd125bf412c69b1f422570c964042))
+
 ## [2.1.1](https://github.com/stenjo/devops-metrics-action/compare/v2.1.0...v2.1.1) (2026-10-21)
 
 
