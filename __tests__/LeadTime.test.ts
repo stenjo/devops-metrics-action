@@ -86,6 +86,26 @@ describe('LeadTime should', () => {
     expect(leadTime).toBe(8)
   })
 
+  it('uses the first release after a pull request even when releases are newest first', async () => {
+    commitsAdapter.getCommits = vi.fn(async (): Promise<Commit[]> => [
+      commit('2023-04-08T00:00:00Z')
+    ])
+    const pulls = [pull({mergedAt: ts('2023-04-10T00:00:00Z')})]
+    const releases = [
+      release('2023-04-30T00:00:00Z', DMA, 'v3.0.0'),
+      release('2023-04-25T00:00:00Z', DMA, 'v2.0.0'),
+      release('2023-04-15T00:00:00Z', DMA, 'v1.0.0')
+    ]
+    const lt = new LeadTime(pulls, releases, commitsAdapter, {
+      window: windowAt('2023-05-01T00:00:00Z')
+    })
+
+    expect(await lt.getLeadTime()).toBe(7)
+    expect(lt.getLog().map(entry => [entry.release, entry.releaseAt])).toEqual([
+      ['v1.0.0', '2023-04-15T00:00:00Z']
+    ])
+  })
+
   it('return 8 on pull-requests with baseRef = main and earlier release on other repo', async () => {
     const pullRequests = [
       pull({
