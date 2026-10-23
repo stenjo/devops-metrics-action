@@ -7,13 +7,16 @@ on:
     branches:
       - main
 
+# Mutation testing only reads; the jobs that push the badge or comment on the PR
+# request their own write scopes.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   stryker-js:
     runs-on: ubuntu-latest
+    outputs:
+      score: ${{ steps.score.outputs.stryker-score }}
 
     steps:
       - name: Checkout Code
@@ -27,11 +30,6 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
-
-      - name: Install Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.x'
 
       - name: Install dependencies
         run: npm ci
@@ -55,6 +53,7 @@ jobs:
           path: stryker.log
 
       - name: Extract stryker score
+        id: score
         run: |
           REPORT="reports/mutation/mutation.json"
           if [ -f "$REPORT" ]; then
@@ -73,13 +72,35 @@ jobs:
             SCORE=$(grep "All files" out | awk '{print $4}' | awk '{split($0,a,"."); print a[1]}')
             SCORE=${SCORE:-0}
           fi
-          echo "stryker-score=$SCORE" >> "$GITHUB_ENV"
+          echo "stryker-score=$SCORE" >> "$GITHUB_OUTPUT"
           echo "Mutation score: $SCORE%"
 
+      - name: Upload results
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mutation-report
+          retention-days: 1
+          path: reports/mutation/
+          overwrite: true
+
+  badge:
+    runs-on: ubuntu-latest
+    name: Update Stryker score badge
+    needs: stryker-js
+    if: github.ref == 'refs/heads/main'
+    # Only this job pushes to main.
+    permissions:
+      contents: write
+    env:
+      SCORE: ${{ needs.stryker-js.outputs.score }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Create the Badge for Stryker Score
-        if: github.ref == 'refs/heads/main'
         run: |
-          SCORE=${{ env.stryker-score }}
           if [ "$SCORE" -ge 90 ]; then COLOR="brightgreen";
           elif [ "$SCORE" -ge 80 ]; then COLOR="green";
           elif [ "$SCORE" -ge 70 ]; then COLOR="yellowgreen";
@@ -90,7 +111,6 @@ jobs:
           curl -s "https://img.shields.io/badge/Stryker%20score-${SCORE}%25-${COLOR}" > badges/stryker.svg
 
       - name: Commit badge
-        if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -109,13 +129,31 @@ jobs:
             exit 1
           fi
 
-      - name: Upload results
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+  pr-report:
+    runs-on: ubuntu-latest
+    name: Generate mutation report for PR
+    needs: stryker-js
+    if: github.event_name == 'pull_request'
+    # Runs PR-controlled code (script/generate_md_report.py) with a read-only
+    # token; the write scopes live in pr-publish, which never checks out the PR.
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.x'
+
+      - name: Download mutation report
+        # Stryker itself is continue-on-error; a missing report must not fail the PR job.
+        continue-on-error: true
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: mutation-report
-          retention-days: 1
           path: reports/mutation/
-          overwrite: true
 
       - name: Parse the json output and generate markdown
         continue-on-error: true
@@ -123,6 +161,40 @@ jobs:
         run: |
           python ./script/generate_md_report.py reports/mutation/mutation.json stryker-report.md https://stenjo.github.io/devops-metrics-action/reports/pr-${{ github.event.pull_request.number }}/mutation-report.html
         shell: /usr/bin/bash -e {0}
+
+      - name: Upload markdown report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: stryker-report
+          retention-days: 1
+          path: stryker-report.md
+          if-no-files-found: ignore
+          overwrite: true
+
+  pr-publish:
+    runs-on: ubuntu-latest
+    name: Publish mutation report to PR
+    needs: pr-report
+    if: github.event_name == 'pull_request'
+    # Trusted job: no checkout of the PR ref, only generated artifacts are consumed.
+    # contents: write pushes the HTML report to gh-pages; pull-requests: write posts the comment.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Download markdown report
+        # Report generation is best-effort; a missing artifact must not fail the PR job.
+        continue-on-error: true
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: stryker-report
+
+      - name: Download mutation report
+        continue-on-error: true
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: mutation-report
+          path: reports/mutation/
 
       - name: Add formatted table to PR comment
         if: hashFiles('stryker-report.md') != ''
@@ -140,21 +212,24 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git init pages
+          cd pages
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-          # Create a new branch for GitHub Pages if it doesn't exist
-          git fetch origin gh-pages:gh-pages || git checkout --orphan gh-pages
-          git checkout gh-pages
+          # Create the GitHub Pages branch if it doesn't exist yet
+          if git fetch origin gh-pages; then
+            git checkout -b gh-pages FETCH_HEAD
+          else
+            git checkout --orphan gh-pages
+          fi
 
-          # Create a directory for this PR and move the report there
-          mkdir -p reports/pr-${{env.PR_NUMBER}}
-          mv reports/mutation/mutation.html reports/pr-${{env.PR_NUMBER}}/mutation-report.html
+          mkdir -p "reports/pr-${PR_NUMBER}"
+          cp ../reports/mutation/mutation.html "reports/pr-${PR_NUMBER}/mutation-report.html"
 
-          # Commit and push the changes
-          git add -f reports/pr-${{env.PR_NUMBER}}/mutation-report.html
-          git commit -m "Deploy mutation report for PR #${{env.PR_NUMBER}}"
+          git add -f "reports/pr-${PR_NUMBER}/mutation-report.html"
+          git commit -m "Deploy mutation report for PR #${PR_NUMBER}"
           git push origin gh-pages
 
       - name: Output the URL
