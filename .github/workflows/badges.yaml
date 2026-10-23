@@ -47,7 +47,9 @@ jobs:
     runs-on: ubuntu-latest
     name: Update DORA metric badges
     needs: metrics
-    # Only this job pushes to main.
+    # Only this job pushes to main, so only run it on main: a dispatch on any
+    # other branch must never check out that branch with a write token.
+    if: github.ref_name == 'main'
     permissions:
       contents: write
     env:
@@ -96,7 +98,6 @@ jobs:
           curl -s "https://img.shields.io/badge/Mean%20Time%20to%20Restore-${MTTR}-${COLOR}" > badges/mean-time-to-restore.svg
 
       - name: Commit badges
-        if: github.ref_name == 'main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
