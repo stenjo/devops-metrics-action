@@ -25,7 +25,7 @@ jobs:
       mttr: ${{ steps.dora.outputs.mttr }}
     steps:
       - name: DevOps Metrics from GitHub
-        uses: stenjo/devops-metrics-action@113a5f73a92b8cd2b69047591eac8d0d9e1806b9 # v2.0.0
+        uses: stenjo/devops-metrics-action@25bbdbe7eb6a45c88ea7f1fceaf6a26b8f07a9fa # v2.1.2
         id: dora
         with:
           owner: 'stenjo'
