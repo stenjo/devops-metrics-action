@@ -150,7 +150,7 @@ jobs:
       - name: Download mutation report
         # Stryker itself is continue-on-error; a missing report must not fail the PR job.
         continue-on-error: true
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: mutation-report
           path: reports/mutation/
@@ -185,13 +185,13 @@ jobs:
       - name: Download markdown report
         # Report generation is best-effort; a missing artifact must not fail the PR job.
         continue-on-error: true
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: stryker-report
 
       - name: Download mutation report
         continue-on-error: true
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: mutation-report
           path: reports/mutation/
