@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.4](https://github.com/stenjo/devops-metrics-action/compare/v2.1.3...v2.1.4) (2026-11-13)
+
+
+### Bug Fixes
+
+* **deps:** patch Dependabot vulnerabilities ([bb80277](https://github.com/stenjo/devops-metrics-action/commit/bb80277c7a0e3fd009396dbb223498a6393618e1))
+
 ## [2.1.3](https://github.com/stenjo/devops-metrics-action/compare/v2.1.2...v2.1.3) (2026-10-29)
 
 
