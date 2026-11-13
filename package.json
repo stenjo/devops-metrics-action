@@ -69,7 +69,9 @@
     "vitest": "^4.1.11"
   },
   "overrides": {
-    "qs": "6.15.3",
+    "follow-redirects": "^1.16.2",
+    "minimatch": "11.0.1",
+    "qs": "6.16.1",
     "undici": "^6.28.0"
   }
 }
